@@ -26,6 +26,7 @@ urlpatterns = [
     path("", core_views.index),
     path("admin/", admin.site.urls),
     path("portal/", include("payrixa.urls")),
+    path("api/v1/", include("payrixa.api.urls")),
     path("__reload__/", include("django_browser_reload.urls")),
 ]
 if settings.DEBUG:

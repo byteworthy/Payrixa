@@ -1,4 +1,4 @@
-# Payrixa
+# 📡 Payrixa
 
 **Early-warning intelligence for healthcare revenue operations.**
 
@@ -21,34 +21,28 @@ We don't automate decisions. We tell you **where to look first**, while there's 
 
 ### Core Features
 
-- **Payer Drift Detection** — Week-over-week analysis identifies when payer denial rates shift beyond normal variance
-- **Claim Upload & Normalization** — CSV upload with automatic payer name and CPT code mapping
-- **Threshold-Based Alerts** — Customizable sensitivity to flag statistically significant changes
-- **Weekly Report Runs** — Scheduled analysis with historical tracking
+- 📊 **Payer Drift Detection** — Week-over-week analysis identifies when payer denial rates shift beyond normal variance
+- 📁 **Claim Upload & Normalization** — CSV upload with automatic payer name and CPT code mapping
+- ⚠️ **Threshold-Based Alerts** — Customizable sensitivity to flag statistically significant changes
+- 📈 **Weekly Report Runs** — Scheduled analysis with historical tracking
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Backend** | Python 3.12, Django 5.x |
-| **Database** | SQLite (dev), PostgreSQL (production) |
-| **Frontend** | Django Templates, HTML5, CSS3 |
-| **Task Scheduling** | Django Management Commands |
-| **Hosting** | GitHub Codespaces (dev), Cloud-ready |
-| **Version Control** | Git, GitHub |
+| Layer | Technology | Why |
+|-------|------------|-----|
+| **Backend** | Python 3.12, Django 5.x | Rapid iteration, batteries included |
+| **API** | Django REST Framework | Industry standard, JWT auth ready |
+| **Database** | SQLite (dev), PostgreSQL (prod) | Simple dev, scalable prod |
+| **Security** | django-auditlog, encrypted fields | PHI compliance ready |
+| **Frontend** | Django Templates → React (planned) | Server-first, SPA later |
 
 ---
 
 ## Getting Started
 
-### Prerequisites
-
-- Python 3.12+
-- pip
-
-### Installation
+### Quick Start
 
 ```bash
 # Install dependencies
@@ -57,7 +51,10 @@ pip install -r requirements.txt
 # Apply database migrations
 python manage.py migrate
 
-# Create a superuser (optional, for admin access)
+# Load demo data (optional - creates sample practice)
+python manage.py loaddata demo_data
+
+# Create a superuser
 python manage.py createsuperuser
 
 # Run the development server
@@ -73,74 +70,71 @@ Visit `http://localhost:8000` to access the application.
 python manage.py run_weekly_payer_drift
 ```
 
+### API Access
+
+```bash
+# Get JWT token
+curl -X POST http://localhost:8000/api/v1/auth/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "your-user", "password": "your-pass"}'
+
+# View API documentation
+open http://localhost:8000/api/v1/docs/
+```
+
 ---
 
 ## Project Structure
 
 ```
 payrixa/
-├── models.py          # Customer, ClaimRecord, ReportRun, DriftResult
-├── views.py           # Upload, Settings, Drift Feed, Reports, Mappings
+├── models.py              # Customer, ClaimRecord, DriftEvent, etc.
+├── views.py               # Web portal views
+├── api/
+│   ├── serializers.py     # DRF serializers
+│   ├── views.py           # API viewsets
+│   ├── permissions.py     # Multi-tenant access control
+│   └── urls.py            # API routes
 ├── services/
-│   └── payer_drift.py # Core drift detection algorithm
-├── management/
-│   └── commands/      # CLI commands for scheduled tasks
-├── templates/         # Django HTML templates
-└── static/            # CSS, images
+│   └── payer_drift.py     # Core drift detection algorithm
+├── management/commands/   # CLI commands for scheduled tasks
+├── fixtures/              # Demo data for onboarding
+└── templates/             # Django HTML templates
 ```
 
 ---
 
 ## Roadmap
 
-### Phase 1: Web Application (Current)
-- [x] Multi-tenant customer architecture
-- [x] CSV claim data upload & processing
-- [x] Payer name normalization mapping
-- [x] CPT code grouping
-- [x] Weekly payer drift detection
-- [x] Report history & results dashboard
-- [ ] Email alert delivery
-- [ ] PDF report generation
+### Phase 1: Core Platform ✅
+Multi-tenant architecture, CSV uploads, payer drift detection, API layer
 
 ### Phase 2: Enhanced Analytics
-- [ ] Trend visualization charts
-- [ ] Custom date range analysis
-- [ ] CPT group-level drift detection
-- [ ] Comparative payer benchmarking
-- [ ] Export functionality (CSV, Excel)
+Trend visualization, custom date ranges, CPT group-level drift, payer benchmarking
 
 ### Phase 3: Desktop Application
-- [ ] Electron-based desktop client
-- [ ] Local data processing option
-- [ ] Offline capability with sync
-- [ ] Native OS notifications
+Electron client, offline capability, native OS notifications
 
-### Phase 4: Enterprise Features
-- [ ] SSO / SAML authentication
-- [ ] Role-based access control
-- [ ] API access for integrations
-- [ ] Webhook notifications
-- [ ] Audit logging
+### Phase 4: Enterprise
+SSO/SAML, role-based access, webhook integrations, audit logging dashboard
 
 ---
 
-## Understanding the Risk
+## Why Early Detection Matters
 
-Healthcare revenue cycle management operates on thin margins. A 2% shift in denial rates from a major payer can represent hundreds of thousands in delayed or lost revenue—compounded weekly.
+Healthcare revenue cycle operates on thin margins. A 2% shift in denial rates from a major payer can mean hundreds of thousands in delayed or lost revenue—compounded weekly.
 
-Traditional approaches catch these problems in monthly or quarterly reviews. By then:
-- Appeal windows may have closed
-- Staff has moved on to new issues  
-- The pattern has already repeated
+Traditional approaches catch these problems in monthly or quarterly reviews. By then, appeal windows may have closed and the pattern has already repeated.
 
-Payrixa's value is **time**. Early detection means early intervention.
+**Payrixa's value is time.** Early detection means early intervention.
 
 ---
 
 ## Contributing
 
 This project is in active development. See [CHANGELOG.md](CHANGELOG.md) for recent updates.
+
+**Questions?** Contact the team at [scale@getbyteworthy.com](mailto:scale@getbyteworthy.com)
 
 ---
 
