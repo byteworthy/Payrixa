@@ -257,14 +257,7 @@ class ReportsView(LoginRequiredMixin, TemplateView):
         except ValueError as e:
             messages.error(self.request, str(e))
         return context
-<task_progress>
-- [x] Inspect current model fields (no changes yet)
-- [x] Create payer_drift.py service module
-- [x] Implement compute_weekly_payer_drift function
-- [x] Add management command
-- [x] Update reports page
-- [ ] Add tests
-</task_progress>
+
 
 class MappingsView(LoginRequiredMixin, View):
     template_name = "payrixa/mappings.html"

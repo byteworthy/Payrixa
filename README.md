@@ -1,25 +1,149 @@
-# GitHub Codespaces ♥️ Django
+# Payrixa
 
-Welcome to your shiny new Codespace running Django! We've got everything fired up and running for you to explore Django.
+**Early-warning intelligence for healthcare revenue operations.**
 
-You've got a blank canvas to work on from a git perspective as well. There's a single initial commit with what you're seeing right now - where you go from here is up to you!
+---
 
-Everything you do here is contained within this one codespace. There is no repository on GitHub yet. If and when you’re ready you can click "Publish Branch" and we’ll create your repository and push up your project. If you were just exploring then and have no further need for this code then you can simply delete your codespace and it's gone forever.
+> Healthcare doesn't fail all at once. It fails quietly.
+>
+> Payers change behavior. Processes slip. Revenue leaks.
+> And most teams only find out after the damage is done.
+>
+> **Payrixa is your early-warning system.**
 
-## installing dependancies
+---
 
-```python
+## What Payrixa Does
+
+Payrixa watches operational and payer behavior patterns to flag what's starting to break—**before it hits revenue**.
+
+We don't automate decisions. We tell you **where to look first**, while there's still time to act.
+
+### Core Features
+
+- **Payer Drift Detection** — Week-over-week analysis identifies when payer denial rates shift beyond normal variance
+- **Claim Upload & Normalization** — CSV upload with automatic payer name and CPT code mapping
+- **Threshold-Based Alerts** — Customizable sensitivity to flag statistically significant changes
+- **Weekly Report Runs** — Scheduled analysis with historical tracking
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Backend** | Python 3.12, Django 5.x |
+| **Database** | SQLite (dev), PostgreSQL (production) |
+| **Frontend** | Django Templates, HTML5, CSS3 |
+| **Task Scheduling** | Django Management Commands |
+| **Hosting** | GitHub Codespaces (dev), Cloud-ready |
+| **Version Control** | Git, GitHub |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12+
+- pip
+
+### Installation
+
+```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-## To collect static files:
+# Apply database migrations
+python manage.py migrate
 
-```python
-python manage.py collectstatic
-```
+# Create a superuser (optional, for admin access)
+python manage.py createsuperuser
 
-## To run this application:
-
-```python
+# Run the development server
 python manage.py runserver
 ```
+
+Visit `http://localhost:8000` to access the application.
+
+### Running Payer Drift Analysis
+
+```bash
+# Run weekly payer drift detection for all customers
+python manage.py run_weekly_payer_drift
+```
+
+---
+
+## Project Structure
+
+```
+payrixa/
+├── models.py          # Customer, ClaimRecord, ReportRun, DriftResult
+├── views.py           # Upload, Settings, Drift Feed, Reports, Mappings
+├── services/
+│   └── payer_drift.py # Core drift detection algorithm
+├── management/
+│   └── commands/      # CLI commands for scheduled tasks
+├── templates/         # Django HTML templates
+└── static/            # CSS, images
+```
+
+---
+
+## Roadmap
+
+### Phase 1: Web Application (Current)
+- [x] Multi-tenant customer architecture
+- [x] CSV claim data upload & processing
+- [x] Payer name normalization mapping
+- [x] CPT code grouping
+- [x] Weekly payer drift detection
+- [x] Report history & results dashboard
+- [ ] Email alert delivery
+- [ ] PDF report generation
+
+### Phase 2: Enhanced Analytics
+- [ ] Trend visualization charts
+- [ ] Custom date range analysis
+- [ ] CPT group-level drift detection
+- [ ] Comparative payer benchmarking
+- [ ] Export functionality (CSV, Excel)
+
+### Phase 3: Desktop Application
+- [ ] Electron-based desktop client
+- [ ] Local data processing option
+- [ ] Offline capability with sync
+- [ ] Native OS notifications
+
+### Phase 4: Enterprise Features
+- [ ] SSO / SAML authentication
+- [ ] Role-based access control
+- [ ] API access for integrations
+- [ ] Webhook notifications
+- [ ] Audit logging
+
+---
+
+## Understanding the Risk
+
+Healthcare revenue cycle management operates on thin margins. A 2% shift in denial rates from a major payer can represent hundreds of thousands in delayed or lost revenue—compounded weekly.
+
+Traditional approaches catch these problems in monthly or quarterly reviews. By then:
+- Appeal windows may have closed
+- Staff has moved on to new issues  
+- The pattern has already repeated
+
+Payrixa's value is **time**. Early detection means early intervention.
+
+---
+
+## Contributing
+
+This project is in active development. See [CHANGELOG.md](CHANGELOG.md) for recent updates.
+
+---
+
+## License
+
+Proprietary — © 2026 Byteworthy. All rights reserved.
