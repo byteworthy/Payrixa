@@ -1,0 +1,55 @@
+{
+  "dashboard": {
+    "title": "Payrixa Application Monitoring",
+    "tags": ["payrixa", "django"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(django_http_requests_total_by_method_total[5m])",
+            "legendFormat": "{{method}}"
+          }
+        ]
+      },
+      {
+        "title": "HTTP Request Latency (p95)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, django_http_requests_latency_seconds_by_view_method_bucket)",
+            "legendFormat": "{{view}}"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate (4xx, 5xx)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(django_http_responses_total_by_status_total{status=~\"4..|5..\"}[5m])",
+            "legendFormat": "{{status}}"
+          }
+        ]
+      },
+      {
+        "title": "Database Query Count",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(django_db_query_total[5m])",
+            "legendFormat": "Queries/sec"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 16,
+    "version": 1
+  }
+}

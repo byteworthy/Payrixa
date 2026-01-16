@@ -28,6 +28,7 @@ urlpatterns = [
     path("portal/", include("payrixa.urls")),
     path("api/v1/", include("payrixa.api.urls")),
     path("__reload__/", include("django_browser_reload.urls")),
+    path("", include("django_prometheus.urls")),  # Metrics endpoint at /metrics
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

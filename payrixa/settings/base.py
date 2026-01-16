@@ -35,6 +35,9 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
 
+    # Third-party - Monitoring
+    "django_prometheus",
+
     # Third-party - Development
     "django_browser_reload",
 
@@ -43,6 +46,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -54,6 +58,7 @@ MIDDLEWARE = [
     "payrixa.middleware.RequestIdMiddleware",
     "auditlog.middleware.AuditlogMiddleware",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 X_FRAME_OPTIONS = "DENY"
