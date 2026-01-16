@@ -1,7 +1,10 @@
 """Alert services for evaluating drift events and sending notifications."""
 import logging
+import os
+import uuid
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.utils import timezone
 from .models import AlertRule, AlertEvent, NotificationChannel
 from payrixa.models import DriftEvent
@@ -124,24 +127,132 @@ def send_alert_notification(alert_event):
     return success
 
 def send_email_notification(alert_event, channel):
-    """Send email notification for an alert event."""
+    """Send email notification with HTML body and PDF attachment for an alert event."""
     config = channel.config or {}
     recipients = config.get('recipients', [])
     if not recipients:
         return False
-    payload = alert_event.payload
-    subject = f"[Payrixa Alert] {alert_event.alert_rule.name} - {payload.get('payer', 'Unknown')}"
-    message = f"Alert: {alert_event.alert_rule.name}\nPayer: {payload.get('payer', 'N/A')}\nDrift Type: {payload.get('drift_type', 'N/A')}\nSeverity: {payload.get('severity', 'N/A')}\nTriggered at: {alert_event.triggered_at}"
-    send_mail(subject=subject, message=message, from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'alerts@payrixa.com'), recipient_list=recipients, fail_silently=False)
-    return True
+    
+    return _send_email_with_pdf(alert_event, recipients)
 
 def send_default_email_notification(alert_event):
-    """Send email notification using default settings."""
+    """Send email notification using default settings with HTML body and PDF attachment."""
     recipients = [getattr(settings, 'DEFAULT_ALERT_EMAIL', 'alerts@example.com')]
+    return _send_email_with_pdf(alert_event, recipients)
+
+def _send_email_with_pdf(alert_event, recipients):
+    """Send branded HTML email with PDF attachment."""
+    from payrixa.middleware import get_request_id
+    from payrixa.reporting.services import generate_weekly_drift_pdf
+    from payrixa.reporting.models import ReportArtifact
+    
+    # Gather context data
+    customer = alert_event.customer
     payload = alert_event.payload
-    subject = f"[Payrixa Alert] {alert_event.alert_rule.name}"
-    message = f"Alert: {alert_event.alert_rule.name}\nPayer: {payload.get('payer', 'N/A')}\nSeverity: {payload.get('severity', 'N/A')}"
-    send_mail(subject=subject, message=message, from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'alerts@payrixa.com'), recipient_list=recipients, fail_silently=False)
+    report_run = alert_event.report_run
+    drift_event = alert_event.drift_event
+    
+    # Get all drift events for this report run
+    if report_run:
+        all_drift_events = report_run.drift_events.all().order_by('-severity')[:5]
+    else:
+        all_drift_events = []
+    
+    # Determine highest severity
+    if all_drift_events:
+        highest_severity_val = max(e.severity for e in all_drift_events)
+        if highest_severity_val >= 0.7:
+            highest_severity = 'high'
+        elif highest_severity_val >= 0.4:
+            highest_severity = 'medium'
+        else:
+            highest_severity = 'low'
+    else:
+        highest_severity = 'unknown'
+    
+    # Get top payer
+    top_payer = payload.get('payer', '')
+    
+    # Build summary sentence
+    event_count = len(all_drift_events)
+    summary_sentence = f"We detected {event_count} significant drift event{'s' if event_count != 1 else ''} in your latest payer analytics report."
+    
+    # Build top drift bullets
+    top_drifts = []
+    for event in all_drift_events[:3]:
+        bullet = f"{event.payer} {event.drift_type.replace('_', ' ').title()}: {event.delta_value:+.2f} change"
+        top_drifts.append(bullet)
+    
+    # Portal URL (configurable via settings)
+    portal_base_url = getattr(settings, 'PORTAL_BASE_URL', 'https://app.payrixa.com')
+    portal_url = f"{portal_base_url}/portal/"
+    
+    # Request ID for traceability
+    request_id = get_request_id() or str(uuid.uuid4())
+    
+    # Render subject
+    subject_context = {
+        'customer_name': customer.name,
+        'highest_severity': highest_severity,
+        'top_payer': top_payer
+    }
+    subject = render_to_string('email/alert_email_subject.txt', subject_context).strip()
+    
+    # Render HTML body
+    html_context = {
+        'customer_name': customer.name,
+        'report_type': 'Weekly Drift Report',
+        'summary_sentence': summary_sentence,
+        'highest_severity': highest_severity,
+        'top_drifts': top_drifts,
+        'top_events': all_drift_events,
+        'portal_url': portal_url,
+        'request_id': request_id
+    }
+    html_body = render_to_string('email/alert_email_body.html', html_context)
+    
+    # Plain text fallback
+    text_body = f"Payrixa Alert - {customer.name}\n\n{summary_sentence}\n\nView the full report: {portal_url}\n\nRequest ID: {request_id}"
+    
+    # Create email
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'alerts@payrixa.com'),
+        to=recipients
+    )
+    email.attach_alternative(html_body, "text/html")
+    
+    # Attach PDF if report_run exists
+    if report_run:
+        try:
+            # Try to fetch existing artifact
+            artifact = ReportArtifact.objects.filter(
+                customer=customer,
+                report_run=report_run,
+                kind='weekly_drift_summary'
+            ).first()
+            
+            # Generate if missing
+            if not artifact:
+                logger.info(f"Generating missing PDF artifact for report run {report_run.id}")
+                artifact = generate_weekly_drift_pdf(report_run.id)
+            
+            # Attach PDF
+            if artifact and artifact.file_path and os.path.exists(artifact.file_path):
+                with open(artifact.file_path, 'rb') as pdf_file:
+                    pdf_content = pdf_file.read()
+                    filename = f"payrixa_weekly_drift_{customer.name.replace(' ', '_').lower()}.pdf"
+                    email.attach(filename, pdf_content, 'application/pdf')
+                    logger.info(f"Attached PDF artifact {artifact.id} to email")
+            else:
+                logger.warning(f"PDF artifact file not found at {artifact.file_path if artifact else 'N/A'}")
+        except Exception as e:
+            logger.error(f"Failed to attach PDF to email: {str(e)}")
+            # Continue without attachment - don't fail the email send
+    
+    # Send email
+    email.send(fail_silently=False)
     return True
 
 def process_pending_alerts():
