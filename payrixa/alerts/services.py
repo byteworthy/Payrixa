@@ -73,7 +73,14 @@ def send_alert_notification(alert_event):
         return False
     
     customer = alert_event.customer
-    channels = NotificationChannel.objects.filter(customer=customer, enabled=True)
+    alert_rule = alert_event.alert_rule
+    
+    # Advanced routing: Use rule-specific channels if configured
+    if alert_rule.routing_channels.exists():
+        channels = alert_rule.routing_channels.filter(enabled=True)
+    else:
+        channels = NotificationChannel.objects.filter(customer=customer, enabled=True)
+    
     success = False
     error_message = None
     
@@ -81,6 +88,11 @@ def send_alert_notification(alert_event):
         for channel in channels:
             if channel.channel_type == 'email':
                 success = send_email_notification(alert_event, channel)
+            elif channel.channel_type == 'slack':
+                success = send_slack_notification(alert_event, channel)
+            elif channel.channel_type == 'webhook':
+                # Webhook handled separately by send_webhooks command
+                logger.info(f"Skipping webhook channel {channel.id} - handled by send_webhooks command")
         
         if not channels.exists():
             success = send_default_email_notification(alert_event)
@@ -254,6 +266,136 @@ def _send_email_with_pdf(alert_event, recipients):
     # Send email
     email.send(fail_silently=False)
     return True
+
+def send_slack_notification(alert_event, channel):
+    """Send Slack notification via webhook."""
+    import json
+    import requests
+    
+    config = channel.config or {}
+    webhook_url = config.get('webhook_url')
+    
+    if not webhook_url:
+        logger.error(f"Slack channel {channel.id} missing webhook_url")
+        return False
+    
+    # Gather context data
+    customer = alert_event.customer
+    payload = alert_event.payload
+    drift_event = alert_event.drift_event
+    alert_rule = alert_event.alert_rule
+    
+    # Build summary message
+    payer = payload.get('payer', 'Unknown')
+    drift_type = payload.get('drift_type', 'Unknown').replace('_', ' ').title()
+    delta = payload.get('delta_value', 0)
+    severity = payload.get('severity', 0)
+    
+    # Severity emoji and color
+    if severity >= 0.7:
+        color = "#d32f2f"  # Red
+        emoji = "🚨"
+    elif severity >= 0.4:
+        color = "#ff9800"  # Orange
+        emoji = "⚠️"
+    else:
+        color = "#2196f3"  # Blue
+        emoji = "ℹ️"
+    
+    # Portal URL
+    portal_base_url = getattr(settings, 'PORTAL_BASE_URL', 'https://app.payrixa.com')
+    portal_url = f"{portal_base_url}/portal/"
+    
+    # Build Slack message with blocks
+    slack_payload = {
+        "text": f"{emoji} Drift Alert: {payer} {drift_type}",
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"{emoji} Drift Alert Triggered"
+                }
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Customer:*\n{customer.name}"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Rule:*\n{alert_rule.name}"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Payer:*\n{payer}"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Drift Type:*\n{drift_type}"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Delta:*\n{delta:+.2f}"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Severity:*\n{severity:.2f}"
+                    }
+                ]
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "View in Payrixa Portal"
+                        },
+                        "url": portal_url,
+                        "style": "primary"
+                    }
+                ]
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"Alert ID: {alert_event.id} | Triggered: {alert_event.triggered_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                    }
+                ]
+            }
+        ],
+        "attachments": [
+            {
+                "color": color,
+                "text": f"This alert was triggered by the *{alert_rule.name}* rule."
+            }
+        ]
+    }
+    
+    try:
+        response = requests.post(
+            webhook_url,
+            data=json.dumps(slack_payload),
+            headers={'Content-Type': 'application/json'},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"Slack notification sent successfully for alert event {alert_event.id}")
+            return True
+        else:
+            logger.error(f"Slack notification failed with status {response.status_code}: {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to send Slack notification: {str(e)}")
+        return False
 
 def process_pending_alerts():
     """Process all pending alert events and send notifications."""

@@ -11,6 +11,18 @@ import io
 import os
 from datetime import datetime, timedelta
 from django.utils import timezone
+from unittest import skipUnless
+
+# Check if weasyprint is available with all dependencies
+def is_weasyprint_available():
+    try:
+        from weasyprint import HTML
+        HTML(string="<html><body>test</body></html>").write_pdf()
+        return True
+    except Exception:
+        return False
+
+WEASYPRINT_AVAILABLE = is_weasyprint_available()
 
 class CSVUploadTests(TestCase):
     def setUp(self):
@@ -520,6 +532,7 @@ class ReportArtifactTests(TestCase):
             outcome=outcome
         )
 
+    @skipUnless(WEASYPRINT_AVAILABLE, "WeasyPrint requires system dependencies (pango, etc)")
     def test_pdf_artifact_creation(self):
         """Test that PDF artifact is created successfully."""
         from payrixa.services.payer_drift import compute_weekly_payer_drift
@@ -564,6 +577,7 @@ class ReportArtifactTests(TestCase):
         self.assertIsNotNone(artifact.content_hash)
         self.assertEqual(len(artifact.content_hash), 64)  # SHA256 hash length
 
+    @skipUnless(WEASYPRINT_AVAILABLE, "WeasyPrint requires system dependencies (pango, etc)")
     def test_pdf_file_exists_and_nonzero(self):
         """Test that generated PDF file exists and has non-zero size."""
         from payrixa.services.payer_drift import compute_weekly_payer_drift
@@ -601,6 +615,7 @@ class ReportArtifactTests(TestCase):
         self.assertGreater(file_size, 0)
         self.assertGreater(file_size, 1000)  # Should be at least 1KB for a real PDF
 
+    @skipUnless(WEASYPRINT_AVAILABLE, "WeasyPrint requires system dependencies (pango, etc)")
     def test_pdf_idempotency(self):
         """Test that generating the same report twice creates idempotent artifact."""
         from payrixa.services.payer_drift import compute_weekly_payer_drift
@@ -658,6 +673,7 @@ class ReportArtifactTests(TestCase):
         ).count()
         self.assertEqual(artifact_count_after, 1)
 
+    @skipUnless(WEASYPRINT_AVAILABLE, "WeasyPrint requires system dependencies (pango, etc)")
     def test_pdf_content_hash_consistency(self):
         """Test that content hash is consistent for identical data."""
         from payrixa.services.payer_drift import compute_weekly_payer_drift

@@ -28,6 +28,12 @@ class AlertRule(BaseModel):
         ('critical', 'Critical'),
         ('emergency', 'Emergency'),
     ], default='warning')
+    
+    # Advanced routing fields
+    routing_channels = models.ManyToManyField('NotificationChannel', blank=True, related_name='alert_rules',
+                                             help_text='Specific channels to route this alert to. If empty, uses all enabled channels.')
+    routing_priority = models.IntegerField(default=0, help_text='Priority for rule evaluation order (higher = earlier)')
+    routing_tags = models.JSONField(default=list, blank=True, help_text='Tags for categorizing and routing alerts')
 
     class Meta:
         verbose_name = 'Alert Rule'
