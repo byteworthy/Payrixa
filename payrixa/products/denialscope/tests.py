@@ -112,3 +112,67 @@ class DenialScopeTests(TestCase):
         ProductConfig.objects.filter(customer=self.customer, product_slug='denialscope').update(enabled=False)
         response = self.client.get('/portal/products/denialscope/')
         self.assertEqual(response.status_code, 403)
+
+    def test_v1_signal_denial_dollars_spike_fires(self):
+        """
+        V1 deterministic test: Verify denial_dollars_spike signal fires.
+        
+        This test mirrors the generate_denialscope_test_data pattern:
+        - Baseline: low denial rate/dollars over 21 days
+        - Recent: high denial rate/dollars over 7 days
+        - Expected signal: denial_dollars_spike
+        """
+        from decimal import Decimal
+        
+        # Baseline period (21 days): 10% denial rate, ~$1,500 denied
+        for day in range(21):
+            days_ago = 28 - day  # Days 28-8
+            # 10 claims per day: 1 denied, 9 paid
+            for i in range(10):
+                if i == 0:
+                    self._create_claim(
+                        'Blue Cross Blue Shield', 'DENIED', days_ago, 
+                        denial_reason='CO-197', allowed_amount=150
+                    )
+                else:
+                    self._create_claim(
+                        'Blue Cross Blue Shield', 'PAID', days_ago,
+                        allowed_amount=150
+                    )
+        
+        # Recent period (7 days): 50% denial rate, ~$5,250 denied  
+        for day in range(7):
+            days_ago = 7 - day  # Days 7-1
+            # 10 claims per day: 5 denied, 5 paid
+            for i in range(10):
+                if i < 5:
+                    self._create_claim(
+                        'Blue Cross Blue Shield', 'DENIED', days_ago,
+                        denial_reason='CO-197', allowed_amount=150
+                    )
+                else:
+                    self._create_claim(
+                        'Blue Cross Blue Shield', 'PAID', days_ago,
+                        allowed_amount=150
+                    )
+        
+        # Run computation
+        service = DenialScopeComputationService(self.customer)
+        result = service.compute(min_volume=5)
+        
+        # Assert at least one signal created
+        signal_count = DenialSignal.objects.filter(customer=self.customer).count()
+        self.assertGreaterEqual(signal_count, 1, 
+            f"Expected at least 1 signal, got {signal_count}. Result: {result}")
+        
+        # Assert denial_dollars_spike is the signal type (V1 primary signal)
+        latest_signal = DenialSignal.objects.filter(
+            customer=self.customer
+        ).order_by('-created_at').first()
+        
+        self.assertIsNotNone(latest_signal)
+        self.assertEqual(latest_signal.signal_type, 'denial_dollars_spike',
+            f"V1 expects denial_dollars_spike, got {latest_signal.signal_type}")
+        self.assertIn(latest_signal.severity, ['critical', 'medium', 'high'],
+            f"Expected severity critical/medium/high, got {latest_signal.severity}")
+        self.assertGreater(latest_signal.confidence, 0.5)

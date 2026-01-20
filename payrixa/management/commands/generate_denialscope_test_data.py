@@ -2,10 +2,10 @@
 Generate deterministic test data that guarantees DenialScope signals fire.
 
 This creates a clear denial spike pattern:
-- Baseline period (21 days): ~10% denial rate
-- Recent period (7 days): ~50% denial rate
+- Baseline period (21 days): ~10% denial rate, ~$1,650 denied
+- Recent period (7 days): ~50% denial rate, ~$4,200 denied
 
-This MUST produce at least one denial_rate_spike signal.
+This MUST produce at least one denial_dollars_spike signal (V1 signal type).
 
 Usage:
     python manage.py generate_denialscope_test_data --customer 1
@@ -150,6 +150,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'✓ Created {claims_created} claim records'))
         self.stdout.write(f'  Baseline denial rate: {baseline_rate:.1%}')
         self.stdout.write(f'  Recent denial rate: {recent_rate:.1%}')
-        self.stdout.write(f'  Expected signal: denial_rate_spike ({baseline_rate:.1%} → {recent_rate:.1%})')
+        self.stdout.write(f'  Expected signal: denial_dollars_spike (V1 signal type)')
         self.stdout.write('')
         self.stdout.write('Now run: python manage.py compute_denialscope --customer 1')

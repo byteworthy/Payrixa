@@ -276,6 +276,13 @@ CELERY_BEAT_SCHEDULE = {
 CELERY_ENABLED = config('CELERY_ENABLED', default=False, cast=bool)
 
 # =============================================================================
+# V1 FEATURE FLAGS
+# =============================================================================
+
+# V1 ships with email-only alerts. Slack is disabled by default.
+SLACK_ENABLED = config('SLACK_ENABLED', default=False, cast=bool)
+
+# =============================================================================
 # SECURITY SETTINGS (Common)
 # =============================================================================
 

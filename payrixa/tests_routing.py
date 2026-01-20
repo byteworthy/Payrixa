@@ -2,7 +2,7 @@
 Tests for Slack integration and advanced routing functionality.
 """
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
@@ -78,6 +78,7 @@ class SlackNotificationTest(TestCase):
             }
         )
     
+    @override_settings(SLACK_ENABLED=True)
     @patch('requests.post')
     def test_send_slack_notification_success(self, mock_post):
         """Test successful Slack notification delivery."""
@@ -100,6 +101,7 @@ class SlackNotificationTest(TestCase):
         self.assertIn('blocks', payload)
         self.assertIn('Medicare', payload['text'])
     
+    @override_settings(SLACK_ENABLED=True)
     @patch('requests.post')
     def test_send_slack_notification_failure(self, mock_post):
         """Test failed Slack notification delivery."""
@@ -112,6 +114,7 @@ class SlackNotificationTest(TestCase):
         
         self.assertFalse(result)
     
+    @override_settings(SLACK_ENABLED=True)
     def test_send_slack_notification_missing_webhook(self):
         """Test Slack notification with missing webhook URL."""
         channel_no_webhook = NotificationChannel.objects.create(
@@ -158,6 +161,7 @@ class AdvancedRoutingTest(TestCase):
             status='completed'
         )
     
+    @override_settings(SLACK_ENABLED=True)
     @patch('requests.post')
     @patch('payrixa.alerts.services._send_email_with_pdf')
     def test_routing_to_specific_channels(self, mock_email, mock_slack):

@@ -272,6 +272,11 @@ def send_slack_notification(alert_event, channel):
     import json
     import requests
     
+    # V1: Slack is disabled by default
+    if not getattr(settings, 'SLACK_ENABLED', False):
+        logger.info(f"Slack disabled (SLACK_ENABLED=False), skipping channel {channel.id}")
+        return True  # Return True to not mark as failed
+    
     config = channel.config or {}
     webhook_url = config.get('webhook_url')
     
