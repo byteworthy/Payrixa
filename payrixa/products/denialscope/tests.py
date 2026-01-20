@@ -1,4 +1,5 @@
 from datetime import timedelta
+from io import StringIO
 from django.core.management import call_command
 from django.test import TestCase
 from django.contrib.auth.models import User
@@ -97,10 +98,12 @@ class DenialScopeTests(TestCase):
         self._create_claim('United', 'DENIED', 5, denial_reason='CO-123')
         self._create_claim('United', 'PAID', 5)
 
-        call_command('compute_denialscope', customer=self.customer.id)
+        out = StringIO()
+        call_command('compute_denialscope', customer=self.customer.id, stdout=out)
         first_count = DenialAggregate.objects.filter(customer=self.customer).count()
 
-        call_command('compute_denialscope', customer=self.customer.id)
+        out = StringIO()
+        call_command('compute_denialscope', customer=self.customer.id, stdout=out)
         second_count = DenialAggregate.objects.filter(customer=self.customer).count()
 
         self.assertEqual(first_count, second_count)
