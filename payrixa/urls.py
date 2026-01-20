@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.generic import RedirectView
 from . import views
 from payrixa.products.denialscope.views import DenialScopeDashboardView
+from payrixa.products.driftwatch.views import DriftWatchDashboardView
 
 urlpatterns = [
     # Root redirect to uploads
@@ -16,8 +17,9 @@ urlpatterns = [
     path("drift-feed/", login_required(views.DriftFeedView.as_view()), name="drift_feed"),
     path("reports/", login_required(views.ReportsView.as_view()), name="reports"),
     
-    # Product line dashboards (Sprint 1 scaffolding)
+    # Product line dashboards (V1: DenialScope + DriftWatch)
     path("products/denialscope/", login_required(DenialScopeDashboardView.as_view()), name="denialscope_dashboard"),
+    path("products/driftwatch/", login_required(DriftWatchDashboardView.as_view()), name="driftwatch_dashboard"),
     path("insights/", login_required(views.InsightsFeedView.as_view()), name="insights_feed"),
 
     # Authentication

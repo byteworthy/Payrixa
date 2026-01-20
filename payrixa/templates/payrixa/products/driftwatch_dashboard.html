@@ -1,0 +1,112 @@
+{% extends "payrixa/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>DriftWatch Dashboard</h1>
+    <p class="text-muted">Volume and decision time drift signals. V1 Signal Type: {{ v1_signal_type }}</p>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% else %}
+    
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Drift Events</h5>
+                    <h2>{{ total_events }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Volume Drift (Denial Rate)</h5>
+                    <h2>{{ denial_rate_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Decision Time Drift</h5>
+                    <h2>{{ decision_time_count }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Payers by Drift -->
+    <div class="card mb-4">
+        <div class="card-header">Top Payers by Drift Frequency</div>
+        <div class="card-body">
+            {% if top_payers %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Payer</th>
+                        <th>Event Count</th>
+                        <th>Avg Severity</th>
+                        <th>Max Delta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payer in top_payers %}
+                    <tr>
+                        <td>{{ payer.payer }}</td>
+                        <td>{{ payer.event_count }}</td>
+                        <td>{{ payer.avg_severity|floatformat:2 }}</td>
+                        <td>{{ payer.max_delta|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted">No drift events yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Drift Events -->
+    <div class="card">
+        <div class="card-header">Recent Drift Events</div>
+        <div class="card-body">
+            {% if drift_events %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Payer</th>
+                        <th>CPT Group</th>
+                        <th>Drift Type</th>
+                        <th>Baseline</th>
+                        <th>Current</th>
+                        <th>Delta</th>
+                        <th>Severity</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in drift_events %}
+                    <tr>
+                        <td>{{ event.payer }}</td>
+                        <td>{{ event.cpt_group }}</td>
+                        <td>{{ event.drift_type }}</td>
+                        <td>{{ event.baseline_value|floatformat:2 }}</td>
+                        <td>{{ event.current_value|floatformat:2 }}</td>
+                        <td>{{ event.delta_value|floatformat:2 }}</td>
+                        <td>{{ event.severity|floatformat:2 }}</td>
+                        <td>{{ event.confidence|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted">No drift events yet. Run drift analysis to detect volume changes.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
