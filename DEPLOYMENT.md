@@ -18,7 +18,7 @@ ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
 CSRF_TRUSTED_ORIGINS=https://yourdomain.com
 
 # Database (required for production)
-DATABASE_URL=postgresql://user:pass@host:5432/payrixa
+DATABASE_URL=postgresql://user:pass@host:5432/payrixa?sslmode=require
 
 # Email (required)
 MAILGUN_API_KEY=key-xxxxx
@@ -42,7 +42,7 @@ docker-compose up -d db
 ### 2. Set Environment
 
 ```bash
-export DATABASE_URL="postgresql://payrixa:payrixa@localhost:5432/payrixa"
+export DATABASE_URL="postgresql://payrixa:payrixa_dev_password@localhost:5432/payrixa?sslmode=disable"
 export DJANGO_SETTINGS_MODULE=payrixa.settings.prod
 export SECRET_KEY="dev-secret-key-change-in-prod"
 export ALLOWED_HOSTS="localhost,127.0.0.1"
@@ -54,29 +54,29 @@ export SECURE_SSL_REDIRECT=False
 ### 3. Migrate Database
 
 ```bash
-python manage.py migrate
+python manage.py migrate --settings=payrixa.settings.prod
 ```
 
 ### 4. Load Demo Data and Run Pipelines
 
 ```bash
 # Load fixtures
-python manage.py loaddata payrixa/fixtures/demo_data.json
+python manage.py loaddata payrixa/fixtures/demo_data.json --settings=payrixa.settings.prod
 
 # Generate DenialScope test data
-python manage.py generate_denialscope_test_data --customer 1
+python manage.py generate_denialscope_test_data --customer 1 --settings=payrixa.settings.prod
 
 # Compute DenialScope signals
-python manage.py compute_denialscope --customer 1
+python manage.py compute_denialscope --customer 1 --settings=payrixa.settings.prod
 
 # Generate DriftWatch demo events
-python manage.py generate_driftwatch_demo --customer 1
+python manage.py generate_driftwatch_demo --customer 1 --settings=payrixa.settings.prod
 ```
 
 ### 5. Verify Dashboards
 
 ```bash
-python manage.py runserver --insecure
+python manage.py runserver --insecure --settings=payrixa.settings.prod
 ```
 
 Open in browser:
