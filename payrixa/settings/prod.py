@@ -53,30 +53,31 @@ SIMPLE_JWT['SIGNING_KEY'] = SECRET_KEY
 # DATABASE
 # =============================================================================
 
-# PostgreSQL configuration for production
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME", default="payrixa"),
-        "USER": config("DB_USER", default="payrixa"),
-        "PASSWORD": config("DB_PASSWORD", default=""),
-        "HOST": config("DB_HOST", default="localhost"),
-        "PORT": config("DB_PORT", default="5432"),
-        "OPTIONS": {
-            "sslmode": "require",  # Required for PHI compliance
-        },
-    }
-}
-
-# Support DATABASE_URL format as well
-# Note: SSL mode should be specified in the DATABASE_URL itself (e.g., ?sslmode=require for prod)
-# This allows local development with ?sslmode=disable while production uses ?sslmode=require
+# Production: Prefer DATABASE_URL for 12-factor compliance
+# SSL mode is controlled via the URL itself (e.g., ?sslmode=require for prod)
 if 'DATABASE_URL' in os.environ:
     import dj_database_url
-    DATABASES['default'] = dj_database_url.parse(
-        config('DATABASE_URL'),
-        conn_max_age=60,
-    )
+    DATABASES = {
+        'default': dj_database_url.parse(
+            config('DATABASE_URL'),
+            conn_max_age=60,
+        )
+    }
+else:
+    # Fallback: individual env vars (deprecated, prefer DATABASE_URL)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("DB_NAME", default="payrixa"),
+            "USER": config("DB_USER", default="payrixa"),
+            "PASSWORD": config("DB_PASSWORD", default=""),
+            "HOST": config("DB_HOST", default="localhost"),
+            "PORT": config("DB_PORT", default="5432"),
+            "OPTIONS": {
+                "sslmode": config("DB_SSLMODE", default="require"),
+            },
+        }
+    }
 
 # =============================================================================
 # EMAIL CONFIGURATION (Production)
