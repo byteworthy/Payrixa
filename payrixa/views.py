@@ -1,5 +1,6 @@
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LogoutView as DjangoLogoutView
 from django.shortcuts import render, redirect
 from django.views import View
 from django.contrib import messages
@@ -389,10 +390,10 @@ class InsightsFeedView(LoginRequiredMixin, TemplateView):
         try:
             customer = get_current_customer(self.request)
             context['customer'] = customer
-            
+
             # Import SystemEvent from ingestion models
             from payrixa.ingestion.models import SystemEvent
-            
+
             # Get recent system events for this customer
             events = SystemEvent.objects.filter(customer=customer).order_by('-created_at')[:50]
             context['events'] = events
@@ -400,3 +401,26 @@ class InsightsFeedView(LoginRequiredMixin, TemplateView):
         except ValueError as e:
             messages.error(self.request, str(e))
         return context
+
+
+class CustomLogoutView(DjangoLogoutView):
+    """Custom logout view that shows which account was logged out."""
+    template_name = "payrixa/logged_out.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        # Capture user context before logging out
+        if request.user.is_authenticated:
+            context = {}
+            if request.user.is_superuser:
+                context['was_operator'] = True
+                context['username'] = request.user.username
+            elif hasattr(request.user, 'profile') and request.user.profile:
+                context['was_operator'] = False
+                context['customer_name'] = request.user.profile.customer.name
+                context['role'] = request.user.profile.get_role_display()
+                context['username'] = request.user.username
+
+            # Store in session before logout
+            request.session['logout_context'] = context
+
+        return super().dispatch(request, *args, **kwargs)

@@ -7,6 +7,7 @@ from django.db.models import Sum
 from payrixa.utils import get_current_customer
 from payrixa.permissions import ProductEnabledMixin
 from payrixa.products.denialscope.models import DenialAggregate, DenialSignal
+from payrixa.alerts.models import AlertEvent
 from payrixa.services.evidence_payload import build_denialscope_evidence_payload, get_alert_interpretation
 
 

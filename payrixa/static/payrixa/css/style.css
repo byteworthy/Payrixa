@@ -82,12 +82,85 @@ body {
     align-items: center;
 }
 
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
 .logo {
     color: var(--primary-color);
     font-size: 1.5rem;
     font-weight: 600;
     margin: 0;
     text-decoration: none;
+}
+
+/* Phase 3: User Context Indicator */
+.user-context {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.context-badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.8rem;
+}
+
+.operator-badge {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+}
+
+.customer-badge {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.role-badge {
+    background-color: #e2e3e5;
+    color: #383d41;
+    text-transform: capitalize;
+}
+
+.role-badge.role-owner {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.role-badge.role-admin {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.role-badge.role-analyst {
+    background-color: #e7f3ff;
+    color: #004085;
+}
+
+.role-badge.role-viewer {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.context-divider {
+    color: #6c757d;
+    font-weight: 300;
+}
+
+.context-label {
+    color: #495057;
+    font-weight: 500;
 }
 
 .main-nav {
