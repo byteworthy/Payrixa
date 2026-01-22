@@ -436,56 +436,87 @@ class AlertDeepDiveView(LoginRequiredMixin, TemplateView):
 
         from payrixa.alerts.models import AlertEvent
         from payrixa.services.evidence_payload import build_driftwatch_evidence_payload, get_alert_interpretation
+        from payrixa.ingestion.models import SystemEvent
 
         try:
             customer = get_current_customer(self.request)
             context['customer'] = customer
 
-            # Get alert event
-            alert_event = AlertEvent.objects.select_related(
-                'alert_rule', 'drift_event', 'report_run'
-            ).prefetch_related('operator_judgments').get(
-                id=alert_id,
-                customer=customer
-            )
-            context['alert_event'] = alert_event
+            # Get alert event with tenant isolation
+            try:
+                alert_event = AlertEvent.objects.select_related(
+                    'alert_rule', 'drift_event', 'report_run'
+                ).prefetch_related('operator_judgments__operator').get(
+                    id=alert_id,
+                    customer=customer
+                )
+                context['alert_event'] = alert_event
+
+                # Log access to deep dive
+                SystemEvent.objects.create(
+                    customer=customer,
+                    event_type='alert_deep_dive_viewed',
+                    payload={
+                        'alert_id': alert_id,
+                        'alert_status': alert_event.status,
+                        'username': self.request.user.username,
+                    },
+                    related_alert=alert_event
+                )
+
+            except AlertEvent.DoesNotExist:
+                messages.error(self.request, f'Alert {alert_id} not found or you do not have access to it.')
+                context['alert_event'] = None
+                return context
 
             # Get operator judgments
             judgments = alert_event.operator_judgments.order_by('-created_at')
             context['judgments'] = judgments
             context['latest_judgment'] = judgments.first() if judgments.exists() else None
 
-            # Build evidence payload
+            # Build evidence payload safely
             if alert_event.drift_event:
-                drift_event = alert_event.drift_event
-                # Get related drift events for context
-                related_events = drift_event.customer.drift_events.filter(
-                    report_run=drift_event.report_run
-                ).order_by('-severity')[:10]
+                try:
+                    drift_event = alert_event.drift_event
+                    # Get related drift events for context
+                    related_events = drift_event.customer.drift_events.filter(
+                        report_run=drift_event.report_run
+                    ).order_by('-severity')[:10]
 
-                evidence_payload = build_driftwatch_evidence_payload(
-                    drift_event,
-                    related_events
-                )
-                context['evidence_payload'] = evidence_payload
+                    evidence_payload = build_driftwatch_evidence_payload(
+                        drift_event,
+                        related_events
+                    )
+                    context['evidence_payload'] = evidence_payload
 
-                # Get interpretation
-                interpretation = get_alert_interpretation(evidence_payload)
-                context['interpretation'] = interpretation
+                    # Get interpretation
+                    interpretation = get_alert_interpretation(evidence_payload)
+                    context['interpretation'] = interpretation
+
+                except Exception as e:
+                    messages.warning(self.request, 'Could not load evidence payload. Showing basic alert information.')
+                    context['evidence_payload'] = None
+                    context['interpretation'] = None
 
                 # Get sample claims if available
-                from payrixa.models import ClaimRecord
-                sample_claims = ClaimRecord.objects.filter(
-                    customer=customer,
-                    payer_name__icontains=drift_event.payer
-                ).order_by('-service_date')[:20]
-                context['sample_claims'] = sample_claims
+                try:
+                    from payrixa.models import ClaimRecord
+                    sample_claims = ClaimRecord.objects.filter(
+                        customer=customer,
+                        payer_name__icontains=drift_event.payer
+                    ).order_by('-service_date')[:20]
+                    context['sample_claims'] = sample_claims
+                except Exception as e:
+                    messages.warning(self.request, 'Could not load sample claims.')
+                    context['sample_claims'] = []
+            else:
+                messages.info(self.request, 'No drift event associated with this alert.')
 
-        except AlertEvent.DoesNotExist:
-            messages.error(self.request, f'Alert {alert_id} not found or access denied')
-            context['alert_event'] = None
         except ValueError as e:
             messages.error(self.request, str(e))
+            context['alert_event'] = None
+        except Exception as e:
+            messages.error(self.request, f'An unexpected error occurred: {str(e)}')
             context['alert_event'] = None
 
         return context

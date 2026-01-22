@@ -413,6 +413,8 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         Submit operator feedback/judgment on an alert event.
         Creates or updates an OperatorJudgment record.
         """
+        from payrixa.ingestion.models import SystemEvent
+
         alert_event = self.get_object()
         customer = get_user_customer(request.user)
 
@@ -444,6 +446,7 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         )
 
         # Update alert event status based on verdict
+        old_status = alert_event.status
         if validated_data['verdict'] == 'noise':
             alert_event.status = 'resolved'
         elif validated_data['verdict'] == 'real':
@@ -452,6 +455,23 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
             alert_event.status = 'pending'
 
         alert_event.save(update_fields=['status'])
+
+        # Log operator feedback action (audit trail)
+        SystemEvent.objects.create(
+            customer=customer,
+            event_type='operator_feedback_submitted',
+            payload={
+                'alert_id': alert_event.id,
+                'verdict': validated_data['verdict'],
+                'previous_status': old_status,
+                'new_status': alert_event.status,
+                'recovered_amount': str(validated_data.get('recovered_amount')) if validated_data.get('recovered_amount') else None,
+                'action': 'created' if created else 'updated',
+                'drift_event_id': alert_event.drift_event.id if alert_event.drift_event else None,
+                'operator_username': request.user.username,
+            },
+            related_alert=alert_event
+        )
 
         serializer = OperatorJudgmentSerializer(judgment)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
