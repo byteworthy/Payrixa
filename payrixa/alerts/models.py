@@ -124,3 +124,55 @@ class Alert(BaseModel):
         verbose_name = 'Alert'
         verbose_name_plural = 'Alerts'
         ordering = ['-created_at']
+
+
+class OperatorJudgment(BaseModel):
+    """Operator feedback and judgments on alert events for memory loop."""
+    customer = models.ForeignKey('payrixa.Customer', on_delete=models.CASCADE, related_name='operator_judgments')
+    alert_event = models.ForeignKey(AlertEvent, on_delete=models.CASCADE, related_name='operator_judgments')
+
+    VERDICT_CHOICES = [
+        ('noise', 'Noise'),
+        ('real', 'Real/Legitimate'),
+        ('needs_followup', 'Needs Follow-up'),
+    ]
+    verdict = models.CharField(max_length=20, choices=VERDICT_CHOICES, help_text='Operator verdict on the alert')
+
+    reason_codes_json = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of reason codes or tags explaining the judgment'
+    )
+
+    recovered_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Dollar amount recovered from this alert (if applicable)'
+    )
+
+    recovered_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text='Date when recovery was confirmed'
+    )
+
+    notes = models.TextField(blank=True, help_text='Optional operator notes')
+
+    operator = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='operator_judgments',
+        help_text='Operator who made the judgment'
+    )
+
+    class Meta:
+        verbose_name = 'Operator Judgment'
+        verbose_name_plural = 'Operator Judgments'
+        ordering = ['-created_at']
+        unique_together = ('alert_event', 'operator')
+
+    def __str__(self):
+        return f"{self.verdict} on Alert #{self.alert_event.id} by {self.operator}"

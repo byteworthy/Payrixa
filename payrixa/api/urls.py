@@ -26,6 +26,7 @@ from .views import (
     DriftEventViewSet,
     PayerMappingViewSet,
     CPTGroupMappingViewSet,
+    AlertEventViewSet,
     DashboardView,
     HealthCheckView,
     WebhookIngestionView,
@@ -41,6 +42,7 @@ router.register(r'reports', ReportRunViewSet, basename='report')
 router.register(r'drift-events', DriftEventViewSet, basename='drift-event')
 router.register(r'payer-mappings', PayerMappingViewSet, basename='payer-mapping')
 router.register(r'cpt-mappings', CPTGroupMappingViewSet, basename='cpt-mapping')
+router.register(r'alerts', AlertEventViewSet, basename='alert-event')
 
 urlpatterns = [
     # Health check (no auth)

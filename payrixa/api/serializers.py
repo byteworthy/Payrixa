@@ -10,6 +10,7 @@ from ..models import (
     Customer, Settings, Upload, ClaimRecord,
     ReportRun, DriftEvent, UserProfile, PayerMapping, CPTGroupMapping
 )
+from payrixa.alerts.models import AlertEvent, OperatorJudgment
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -196,10 +197,66 @@ class DriftInsightSerializer(serializers.Serializer):
 
 class DashboardSerializer(serializers.Serializer):
     """Dashboard overview data."""
-    
+
     total_claims = serializers.IntegerField()
     total_uploads = serializers.IntegerField()
     active_drift_events = serializers.IntegerField()
     last_report_date = serializers.DateTimeField(allow_null=True)
     denial_rate_trend = serializers.ListField(child=serializers.DictField())
     top_drift_payers = serializers.ListField(child=serializers.DictField())
+
+
+# =============================================================================
+# Alert & Operator Judgment Serializers
+# =============================================================================
+
+class OperatorJudgmentSerializer(serializers.ModelSerializer):
+    """Serializer for OperatorJudgment model."""
+
+    operator_username = serializers.CharField(source='operator.username', read_only=True)
+
+    class Meta:
+        model = OperatorJudgment
+        fields = [
+            'id', 'customer', 'alert_event', 'verdict', 'reason_codes_json',
+            'recovered_amount', 'recovered_date', 'notes', 'operator',
+            'operator_username', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'customer', 'operator', 'operator_username', 'created_at', 'updated_at']
+
+
+class AlertEventSerializer(serializers.ModelSerializer):
+    """Serializer for AlertEvent model with operator judgments."""
+
+    operator_judgments = OperatorJudgmentSerializer(many=True, read_only=True)
+    has_judgment = serializers.SerializerMethodField()
+    latest_judgment_verdict = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AlertEvent
+        fields = [
+            'id', 'customer', 'alert_rule', 'drift_event', 'report_run',
+            'triggered_at', 'status', 'payload', 'notification_sent_at',
+            'error_message', 'operator_judgments', 'has_judgment',
+            'latest_judgment_verdict', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'triggered_at']
+
+    def get_has_judgment(self, obj):
+        """Check if this alert has any operator judgment."""
+        return obj.operator_judgments.exists()
+
+    def get_latest_judgment_verdict(self, obj):
+        """Get the most recent operator judgment verdict."""
+        latest = obj.operator_judgments.order_by('-created_at').first()
+        return latest.verdict if latest else None
+
+
+class OperatorFeedbackSerializer(serializers.Serializer):
+    """Serializer for operator feedback submission."""
+
+    verdict = serializers.ChoiceField(choices=[('noise', 'Noise'), ('real', 'Real/Legitimate'), ('needs_followup', 'Needs Follow-up')])
+    reason_codes = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    recovered_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    recovered_date = serializers.DateField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True)

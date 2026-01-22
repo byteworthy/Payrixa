@@ -125,9 +125,17 @@
                     </thead>
                     <tbody>
                         {% for event in drift_events %}
-                        <tr>
+                        <tr data-alert-id="{{ event.alert_event_id }}">
                             <td>
                                 <span class="urgency-badge {{ event.urgency_level }}">{{ event.urgency_label }}</span>
+                                {% if event.has_judgment %}
+                                <br><small class="judgment-badge judgment-{{ event.judgment_verdict }}">
+                                    {% if event.judgment_verdict == 'noise' %}🔇 Marked as Noise
+                                    {% elif event.judgment_verdict == 'real' %}✓ Confirmed Real
+                                    {% elif event.judgment_verdict == 'needs_followup' %}🔍 Needs Follow-up
+                                    {% endif %}
+                                </small>
+                                {% endif %}
                             </td>
                             <td><strong>{{ event.payer }}</strong><br><small class="text-muted">{{ event.cpt_group }}</small></td>
                             <td class="interpretation-cell">
@@ -144,9 +152,13 @@
                             </td>
                             <td><small>{{ event.created_at|date:"M d, H:i" }}</small></td>
                             <td class="quick-actions">
-                                <button class="btn-action btn-review" onclick="showNotWiredModal()">✓ Reviewed</button>
-                                <button class="btn-action btn-flag" onclick="showNotWiredModal()">🔍 Deep Dive</button>
-                                <button class="btn-action btn-noise" onclick="showNotWiredModal()">🔇 Noise</button>
+                                {% if event.alert_event_id %}
+                                <button class="btn-action btn-review" onclick="submitFeedback({{ event.alert_event_id }}, 'real', this)">✓ Reviewed</button>
+                                <button class="btn-action btn-flag" onclick="submitFeedback({{ event.alert_event_id }}, 'needs_followup', this)">🔍 Deep Dive</button>
+                                <button class="btn-action btn-noise" onclick="submitFeedback({{ event.alert_event_id }}, 'noise', this)">🔇 Noise</button>
+                                {% else %}
+                                <small class="text-muted">No alert event</small>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
@@ -160,12 +172,12 @@
         </details>
     </div>
 
-    <!-- Not Wired Modal (Deliverable 8) -->
-    <div id="notWiredModal" class="modal" style="display:none;">
+    <!-- Feedback Status Modal -->
+    <div id="feedbackModal" class="modal" style="display:none;">
         <div class="modal-content">
-            <h4>🚧 Coming Soon</h4>
-            <p>Quick actions are not yet wired to the backend. This feature is planned for the next release.</p>
-            <button class="btn-close" onclick="closeNotWiredModal()">OK, Got It</button>
+            <h4 id="feedbackTitle">Processing...</h4>
+            <p id="feedbackMessage"></p>
+            <button class="btn-close" onclick="closeFeedbackModal()">OK</button>
         </div>
     </div>
 
@@ -360,13 +372,90 @@
         border-radius: 4px;
         cursor: pointer;
     }
+    /* Judgment badge styling */
+    .judgment-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-size: 0.7rem;
+        margin-top: 4px;
+    }
+    .judgment-badge.judgment-noise { background: #e0e0e0; color: #616161; }
+    .judgment-badge.judgment-real { background: #c8e6c9; color: #2e7d32; }
+    .judgment-badge.judgment-needs_followup { background: #fff3e0; color: #e65100; }
+    .btn-action:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>
 <script>
-function showNotWiredModal() {
-    document.getElementById('notWiredModal').style.display = 'flex';
+// Get CSRF token from cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
-function closeNotWiredModal() {
-    document.getElementById('notWiredModal').style.display = 'none';
+
+function submitFeedback(alertEventId, verdict, buttonElement) {
+    // Disable all buttons in this row
+    const row = buttonElement.closest('tr');
+    const buttons = row.querySelectorAll('.btn-action');
+    buttons.forEach(btn => btn.disabled = true);
+
+    // Submit feedback to API
+    fetch(`/api/v1/alerts/${alertEventId}/feedback/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            verdict: verdict,
+            notes: `Operator feedback from dashboard on ${new Date().toISOString()}`
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => Promise.reject(err));
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Show success modal
+        showFeedbackModal('✓ Feedback Submitted', `Alert marked as "${verdict}". Refreshing page...`);
+
+        // Reload page after 1.5 seconds to show updated judgment badges
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    })
+    .catch(error => {
+        console.error('Error submitting feedback:', error);
+        showFeedbackModal('❌ Error', error.detail || 'Failed to submit feedback. Please try again.');
+
+        // Re-enable buttons on error
+        buttons.forEach(btn => btn.disabled = false);
+    });
+}
+
+function showFeedbackModal(title, message) {
+    document.getElementById('feedbackTitle').textContent = title;
+    document.getElementById('feedbackMessage').textContent = message;
+    document.getElementById('feedbackModal').style.display = 'flex';
+}
+
+function closeFeedbackModal() {
+    document.getElementById('feedbackModal').style.display = 'none';
 }
 </script>
 {% endblock %}

@@ -18,6 +18,7 @@ from ..models import (
     Customer, Settings, Upload, ClaimRecord,
     ReportRun, DriftEvent, PayerMapping, CPTGroupMapping
 )
+from payrixa.alerts.models import AlertEvent, OperatorJudgment
 from payrixa.ingestion.models import IngestionToken
 from payrixa.ingestion import IngestionService
 from .serializers import (
@@ -25,7 +26,8 @@ from .serializers import (
     ClaimRecordSerializer, ClaimRecordSummarySerializer,
     ReportRunSerializer, ReportRunSummarySerializer, DriftEventSerializer,
     PayerMappingSerializer, CPTGroupMappingSerializer,
-    PayerSummarySerializer, DashboardSerializer
+    PayerSummarySerializer, DashboardSerializer,
+    AlertEventSerializer, OperatorJudgmentSerializer, OperatorFeedbackSerializer
 )
 from .permissions import IsCustomerMember, get_user_customer
 
@@ -337,9 +339,9 @@ class DashboardView(APIView):
     """
     API endpoint for dashboard overview data.
     """
-    
+
     permission_classes = [IsAuthenticated, IsCustomerMember]
-    
+
     @extend_schema(
         summary="Get dashboard overview",
         responses={200: DashboardSerializer}
@@ -351,21 +353,21 @@ class DashboardView(APIView):
                 {'error': 'No customer associated with user'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Get counts
         total_claims = ClaimRecord.objects.filter(customer=customer).count()
         total_uploads = Upload.objects.filter(customer=customer, status='success').count()
-        
+
         # Get latest report
         latest_report = ReportRun.objects.filter(
             customer=customer,
             status='success'
         ).order_by('-finished_at').first()
-        
+
         active_drift_events = 0
         if latest_report:
             active_drift_events = latest_report.drift_events.count()
-        
+
         # Get top drift payers from latest report
         top_drift_payers = []
         if latest_report:
@@ -376,7 +378,7 @@ class DashboardView(APIView):
                     'severity': event.severity,
                     'delta_value': event.delta_value
                 })
-        
+
         data = {
             'total_claims': total_claims,
             'total_uploads': total_uploads,
@@ -385,9 +387,74 @@ class DashboardView(APIView):
             'denial_rate_trend': [],  # TODO: Compute trend data
             'top_drift_payers': top_drift_payers
         }
-        
+
         serializer = DashboardSerializer(data)
         return Response(serializer.data)
+
+
+class AlertEventViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
+    """
+    API endpoint for managing alert events with operator feedback.
+    """
+
+    queryset = AlertEvent.objects.all().select_related('alert_rule', 'drift_event').prefetch_related('operator_judgments')
+    serializer_class = AlertEventSerializer
+    permission_classes = [IsAuthenticated, IsCustomerMember]
+    ordering = ['-triggered_at']
+
+    @action(detail=True, methods=['post'], url_path='feedback')
+    @extend_schema(
+        summary="Submit operator feedback on an alert",
+        request=OperatorFeedbackSerializer,
+        responses={201: OperatorJudgmentSerializer, 400: dict}
+    )
+    def feedback(self, request, pk=None):
+        """
+        Submit operator feedback/judgment on an alert event.
+        Creates or updates an OperatorJudgment record.
+        """
+        alert_event = self.get_object()
+        customer = get_user_customer(request.user)
+
+        if not customer:
+            return Response(
+                {'error': 'No customer associated with user'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate input
+        feedback_serializer = OperatorFeedbackSerializer(data=request.data)
+        if not feedback_serializer.is_valid():
+            return Response(feedback_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = feedback_serializer.validated_data
+
+        # Create or update operator judgment
+        judgment, created = OperatorJudgment.objects.update_or_create(
+            alert_event=alert_event,
+            operator=request.user,
+            defaults={
+                'customer': customer,
+                'verdict': validated_data['verdict'],
+                'reason_codes_json': validated_data.get('reason_codes', []),
+                'recovered_amount': validated_data.get('recovered_amount'),
+                'recovered_date': validated_data.get('recovered_date'),
+                'notes': validated_data.get('notes', ''),
+            }
+        )
+
+        # Update alert event status based on verdict
+        if validated_data['verdict'] == 'noise':
+            alert_event.status = 'resolved'
+        elif validated_data['verdict'] == 'real':
+            alert_event.status = 'acknowledged'
+        elif validated_data['verdict'] == 'needs_followup':
+            alert_event.status = 'pending'
+
+        alert_event.save(update_fields=['status'])
+
+        serializer = OperatorJudgmentSerializer(judgment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 class WebhookIngestionView(APIView):

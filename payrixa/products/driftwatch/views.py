@@ -12,6 +12,7 @@ from django.db.models import Count, Avg, Max
 
 from payrixa.utils import get_current_customer
 from payrixa.models import DriftEvent, ReportRun
+from payrixa.alerts.models import AlertEvent
 from payrixa.products.driftwatch import DRIFTWATCH_V1_EVENT_TYPE
 from payrixa.services.evidence_payload import build_driftwatch_evidence_payload, get_alert_interpretation
 from payrixa.permissions import ProductEnabledMixin
@@ -55,9 +56,17 @@ class DriftWatchDashboardView(LoginRequiredMixin, ProductEnabledMixin, TemplateV
                     'product_name': 'DriftWatch',
                 }
                 interp = get_alert_interpretation(event_payload)
+
+                # Get associated alert event (if exists) for operator feedback
+                alert_event = AlertEvent.objects.filter(drift_event=event).first()
+                latest_judgment = None
+                if alert_event and alert_event.operator_judgments.exists():
+                    latest_judgment = alert_event.operator_judgments.order_by('-created_at').first()
+
                 # Attach interpretation to event as dict for template access
                 drift_events.append({
                     'event': event,
+                    'alert_event_id': alert_event.id if alert_event else None,
                     'payer': event.payer,
                     'cpt_group': event.cpt_group,
                     'drift_type': event.drift_type,
@@ -71,6 +80,8 @@ class DriftWatchDashboardView(LoginRequiredMixin, ProductEnabledMixin, TemplateV
                     'urgency_level': interp['urgency_level'],
                     'plain_language': interp['plain_language'],
                     'is_likely_noise': interp['is_likely_noise'],
+                    'has_judgment': latest_judgment is not None,
+                    'judgment_verdict': latest_judgment.verdict if latest_judgment else None,
                 })
 
             # Summary metrics (from v1 filtered queryset)

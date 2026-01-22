@@ -138,23 +138,12 @@
                     &middot; {{ signal.created_at|date:"M d, H:i" }}
                 </p>
                 <div class="quick-actions">
-                    <button class="btn-action btn-review" onclick="showNotWiredModal()">✓ Reviewed</button>
-                    <button class="btn-action btn-flag" onclick="showNotWiredModal()">🔍 Deep Dive</button>
-                    <button class="btn-action btn-noise" onclick="showNotWiredModal()">🔇 Noise</button>
+                    <small class="text-muted">Operator feedback available on DriftWatch alerts</small>
                 </div>
             </div>
             {% empty %}
             <div class="empty">No signals yet.</div>
             {% endfor %}
-        </div>
-    </div>
-
-    <!-- Not Wired Modal (Deliverable 8) -->
-    <div id="notWiredModal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <h4>🚧 Coming Soon</h4>
-            <p>Quick actions are not yet wired to the backend. This feature is planned for the next release.</p>
-            <button class="btn-close" onclick="closeNotWiredModal()">OK, Got It</button>
         </div>
     </div>
 </div>
@@ -390,13 +379,6 @@
         border-radius: 4px;
         cursor: pointer;
     }
+    .text-muted { color: #888; font-style: italic; }
 </style>
-<script>
-function showNotWiredModal() {
-    document.getElementById('notWiredModal').style.display = 'flex';
-}
-function closeNotWiredModal() {
-    document.getElementById('notWiredModal').style.display = 'none';
-}
-</script>
 {% endblock %}
