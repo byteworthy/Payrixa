@@ -27,6 +27,9 @@ urlpatterns = [
     path("products/driftwatch/", login_required(DriftWatchDashboardView.as_view()), name="driftwatch_dashboard"),
     path("insights/", login_required(views.InsightsFeedView.as_view()), name="insights_feed"),
 
+    # Alert deep dive (Phase 4)
+    path("alerts/<int:alert_id>/deep-dive/", login_required(views.AlertDeepDiveView.as_view()), name="alert_deep_dive"),
+
     # Authentication
     path("login/", auth_views.LoginView.as_view(template_name="payrixa/login.html"), name="login"),
     path("logout/", views.CustomLogoutView.as_view(), name="logout"),

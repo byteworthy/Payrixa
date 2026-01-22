@@ -154,7 +154,7 @@
                             <td class="quick-actions">
                                 {% if event.alert_event_id %}
                                 <button class="btn-action btn-review" onclick="submitFeedback({{ event.alert_event_id }}, 'real', this)">✓ Reviewed</button>
-                                <button class="btn-action btn-flag" onclick="submitFeedback({{ event.alert_event_id }}, 'needs_followup', this)">🔍 Deep Dive</button>
+                                <a href="{% url 'alert_deep_dive' event.alert_event_id %}" class="btn-action btn-flag">🔍 Deep Dive</a>
                                 <button class="btn-action btn-noise" onclick="submitFeedback({{ event.alert_event_id }}, 'noise', this)">🔇 Noise</button>
                                 {% else %}
                                 <small class="text-muted">No alert event</small>

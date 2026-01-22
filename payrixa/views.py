@@ -424,3 +424,68 @@ class CustomLogoutView(DjangoLogoutView):
             request.session['logout_context'] = context
 
         return super().dispatch(request, *args, **kwargs)
+
+
+class AlertDeepDiveView(LoginRequiredMixin, TemplateView):
+    """Deep dive view for alert evidence and details."""
+    template_name = "payrixa/alert_deep_dive.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        alert_id = self.kwargs.get('alert_id')
+
+        from payrixa.alerts.models import AlertEvent
+        from payrixa.services.evidence_payload import build_driftwatch_evidence_payload, get_alert_interpretation
+
+        try:
+            customer = get_current_customer(self.request)
+            context['customer'] = customer
+
+            # Get alert event
+            alert_event = AlertEvent.objects.select_related(
+                'alert_rule', 'drift_event', 'report_run'
+            ).prefetch_related('operator_judgments').get(
+                id=alert_id,
+                customer=customer
+            )
+            context['alert_event'] = alert_event
+
+            # Get operator judgments
+            judgments = alert_event.operator_judgments.order_by('-created_at')
+            context['judgments'] = judgments
+            context['latest_judgment'] = judgments.first() if judgments.exists() else None
+
+            # Build evidence payload
+            if alert_event.drift_event:
+                drift_event = alert_event.drift_event
+                # Get related drift events for context
+                related_events = drift_event.customer.drift_events.filter(
+                    report_run=drift_event.report_run
+                ).order_by('-severity')[:10]
+
+                evidence_payload = build_driftwatch_evidence_payload(
+                    drift_event,
+                    related_events
+                )
+                context['evidence_payload'] = evidence_payload
+
+                # Get interpretation
+                interpretation = get_alert_interpretation(evidence_payload)
+                context['interpretation'] = interpretation
+
+                # Get sample claims if available
+                from payrixa.models import ClaimRecord
+                sample_claims = ClaimRecord.objects.filter(
+                    customer=customer,
+                    payer_name__icontains=drift_event.payer
+                ).order_by('-service_date')[:20]
+                context['sample_claims'] = sample_claims
+
+        except AlertEvent.DoesNotExist:
+            messages.error(self.request, f'Alert {alert_id} not found or access denied')
+            context['alert_event'] = None
+        except ValueError as e:
+            messages.error(self.request, str(e))
+            context['alert_event'] = None
+
+        return context
