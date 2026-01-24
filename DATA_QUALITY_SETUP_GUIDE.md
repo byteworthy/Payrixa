@@ -380,13 +380,13 @@ if critical > 0:
 
 ```bash
 # Test data quality service
-python manage.py test payrixa.tests_data_quality
+python manage.py test upstream.tests_data_quality
 
 # Test validation rules
-python manage.py test payrixa.tests_validation
+python manage.py test upstream.tests_validation
 
 # Test ML services
-python manage.py test payrixa.products.denialscope.tests_ml
+python manage.py test upstream.products.denialscope.tests_ml
 ```
 
 ---

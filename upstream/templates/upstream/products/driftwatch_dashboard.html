@@ -537,6 +537,10 @@ function submitFeedback(alertEventId, verdict, buttonElement) {
         })
     })
     .then(response => {
+        // Check for CSRF validation failure
+        if (response.status === 403) {
+            throw new Error('CSRF validation failed. Please refresh the page and try again.');
+        }
         if (!response.ok) {
             return response.json().then(err => Promise.reject(err));
         }

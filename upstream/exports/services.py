@@ -102,7 +102,8 @@ class ExportService:
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except (AttributeError, TypeError):
+                    # Cell has no value or can't be stringified
                     pass
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[column_letter].width = adjusted_width
@@ -179,7 +180,8 @@ class ExportService:
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except (AttributeError, TypeError):
+                    # Cell has no value or can't be stringified
                     pass
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[column_letter].width = adjusted_width
@@ -275,7 +277,8 @@ class ExportService:
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
-                except:
+                except (AttributeError, TypeError):
+                    # Cell has no value or can't be stringified
                     pass
             adjusted_width = min(max_length + 2, 30)
             ws_details.column_dimensions[column_letter].width = adjusted_width

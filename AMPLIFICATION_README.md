@@ -327,22 +327,22 @@ UNDERPAYMENT_THRESHOLD = 0.05  # 5% underpayment
 ### Unit Tests
 ```bash
 # Data quality
-python manage.py test payrixa.tests_data_quality
+python manage.py test upstream.tests_data_quality
 
 # Validation
-python manage.py test payrixa.tests_validation
+python manage.py test upstream.tests_validation
 
 # DriftWatch
-python manage.py test payrixa.products.driftwatch.tests
+python manage.py test upstream.products.driftwatch.tests
 
 # DenialScope
-python manage.py test payrixa.products.denialscope.tests_ml
+python manage.py test upstream.products.denialscope.tests_ml
 ```
 
 ### Integration Tests
 ```bash
 # Full workflow
-python manage.py test payrixa.tests_integration
+python manage.py test upstream.tests_integration
 ```
 
 ---

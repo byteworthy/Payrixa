@@ -221,9 +221,25 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
+// Helper function to get CSRF token from cookies (more reliable than template variable)
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Anomalies by Type Chart
-    const typeData = {{ anomaly_report.by_type|safe }};
+    const typeData = {{ anomaly_report_by_type_json }};
     const typeCtx = document.getElementById('anomalyTypeChart').getContext('2d');
 
     new Chart(typeCtx, {
@@ -253,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Anomalies by Severity Chart
-    const severityData = {{ anomaly_report.by_severity|safe }};
+    const severityData = {{ anomaly_report_by_severity_json }};
     const severityCtx = document.getElementById('anomalySeverityChart').getContext('2d');
 
     new Chart(severityCtx, {
@@ -297,14 +313,23 @@ function acknowledgeAnomaly(anomalyId) {
     fetch(`/api/quality/anomaly/${anomalyId}/acknowledge/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
+            'X-CSRFToken': getCookie('csrftoken'),
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             notes: notes
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        // Check for CSRF validation failure
+        if (response.status === 403) {
+            throw new Error('CSRF validation failed. Please refresh the page and try again.');
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             alert('Anomaly acknowledged successfully');
@@ -315,7 +340,7 @@ function acknowledgeAnomaly(anomalyId) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to acknowledge anomaly');
+        alert('Failed to acknowledge anomaly: ' + error.message);
     });
 }
 </script>

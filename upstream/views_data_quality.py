@@ -9,10 +9,12 @@ Provides comprehensive dashboards and reports for:
 - Quality scorecards
 """
 
+import json
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from datetime import timedelta
 
 from upstream.models import Upload, DataQualityReport, Customer
@@ -70,12 +72,18 @@ def data_quality_dashboard(request):
     # Get quality trend (last 30 days)
     trend_report = reporting_service.generate_quality_trend_report(days=30)
 
+    # Security Fix: Properly serialize JSON for JavaScript injection
+    trend_report_daily_quality_json = mark_safe(
+        json.dumps(trend_report.get('daily_quality', []))
+    )
+
     context = {
         'customer': customer,
         'scorecard': scorecard,
         'recent_uploads': uploads_with_quality,
         'recent_anomalies': recent_anomalies,
         'trend_report': trend_report,
+        'trend_report_daily_quality_json': trend_report_daily_quality_json,
         'page_title': 'Data Quality Dashboard',
     }
 
@@ -184,17 +192,37 @@ def quality_trends(request):
         if metric.metric_type not in metrics_by_type:
             metrics_by_type[metric.metric_type] = []
         metrics_by_type[metric.metric_type].append({
-            'date': metric.measurement_date,
+            'date': metric.measurement_date.isoformat(),
             'score': metric.score,
             'grade': metric.quality_grade,
         })
+
+    # Security Fix: Properly serialize JSON for JavaScript injection
+    trend_report_daily_quality_json = mark_safe(
+        json.dumps(trend_report.get('daily_quality', []))
+    )
+    failure_report_severity_breakdown_json = mark_safe(
+        json.dumps(failure_report.get('severity_breakdown', {}))
+    )
+    # Prepare metrics data for template with JSON-serialized values
+    metrics_with_json = [
+        {
+            'type': metric_type,
+            'data': data,
+            'data_json': mark_safe(json.dumps(data))
+        }
+        for metric_type, data in metrics_by_type.items()
+    ]
 
     context = {
         'customer': customer,
         'days': days,
         'trend_report': trend_report,
+        'trend_report_daily_quality_json': trend_report_daily_quality_json,
         'failure_report': failure_report,
+        'failure_report_severity_breakdown_json': failure_report_severity_breakdown_json,
         'metrics_by_type': metrics_by_type,
+        'metrics_with_json': metrics_with_json,
         'page_title': f'Quality Trends ({days} days)',
     }
 
@@ -223,10 +251,21 @@ def anomaly_dashboard(request):
         acknowledged=False
     ).order_by('-severity', '-anomaly_score')
 
+    # M-3 Security Fix: Properly serialize JSON for JavaScript injection
+    # Convert query results to JSON-safe format and mark as safe
+    anomaly_report_by_type_json = mark_safe(
+        json.dumps(list(anomaly_report.get('by_type', [])))
+    )
+    anomaly_report_by_severity_json = mark_safe(
+        json.dumps(anomaly_report.get('by_severity', {}))
+    )
+
     context = {
         'customer': customer,
         'days': days,
         'anomaly_report': anomaly_report,
+        'anomaly_report_by_type_json': anomaly_report_by_type_json,
+        'anomaly_report_by_severity_json': anomaly_report_by_severity_json,
         'unacknowledged_anomalies': unacknowledged,
         'page_title': 'Data Anomalies',
     }

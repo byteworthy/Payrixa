@@ -51,10 +51,6 @@ RUN python manage.py collectstatic --no-input --settings=upstream.settings.prod 
 # Expose port (Cloud Run uses PORT env var, default 8080)
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/health/', timeout=2)"
-
 # Start Gunicorn (Cloud Run provides PORT env var)
 CMD exec gunicorn hello_world.wsgi:application \
     --bind :$PORT \

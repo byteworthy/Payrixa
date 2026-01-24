@@ -6,6 +6,8 @@ and security considerations for PHI data.
 """
 
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 from ..models import (
     Customer, Settings, Upload, ClaimRecord,
     ReportRun, DriftEvent, UserProfile, PayerMapping, CPTGroupMapping
@@ -88,12 +90,14 @@ class DriftEventSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
     
+    @extend_schema_field(OpenApiTypes.FLOAT)
     def get_delta_percent(self, obj):
         """Calculate percentage change from baseline."""
         if obj.baseline_value and obj.baseline_value != 0:
             return round((obj.delta_value / obj.baseline_value) * 100, 2)
         return None
     
+    @extend_schema_field(OpenApiTypes.STR)
     def get_severity_label(self, obj):
         """Human-readable severity label."""
         if obj.severity >= 0.8:
@@ -120,6 +124,7 @@ class ReportRunSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'started_at', 'finished_at', 'status', 'summary_json']
     
+    @extend_schema_field(OpenApiTypes.INT)
     def get_drift_event_count(self, obj):
         """Count of drift events in this report."""
         return obj.drift_events.count()
@@ -127,13 +132,14 @@ class ReportRunSerializer(serializers.ModelSerializer):
 
 class ReportRunSummarySerializer(serializers.ModelSerializer):
     """Lightweight serializer for ReportRun listings."""
-    
+
     drift_event_count = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = ReportRun
         fields = ['id', 'run_type', 'started_at', 'status', 'drift_event_count']
-    
+
+    @extend_schema_field(OpenApiTypes.INT)
     def get_drift_event_count(self, obj):
         return obj.drift_events.count()
 
@@ -242,10 +248,12 @@ class AlertEventSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'triggered_at']
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_judgment(self, obj):
         """Check if this alert has any operator judgment."""
         return obj.operator_judgments.exists()
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_latest_judgment_verdict(self, obj):
         """Get the most recent operator judgment verdict."""
         latest = obj.operator_judgments.order_by('-created_at').first()
@@ -260,3 +268,11 @@ class OperatorFeedbackSerializer(serializers.Serializer):
     recovered_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     recovered_date = serializers.DateField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class HealthCheckSerializer(serializers.Serializer):
+    """Serializer for health check endpoint response."""
+
+    status = serializers.CharField(help_text="Health status: 'healthy' or 'unhealthy'")
+    version = serializers.CharField(help_text="Application version")
+    timestamp = serializers.DateTimeField(help_text="Current server timestamp")

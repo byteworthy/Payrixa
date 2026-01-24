@@ -371,9 +371,9 @@ crontab -e
 
 ```cron
 # Daily backup at 2 AM
-0 2 * * * /usr/local/bin/backup-payrixa.sh
+0 2 * * * /usr/local/bin/backup-upstream.sh
 
-# backup-payrixa.sh:
+# backup-upstream.sh:
 #!/bin/bash
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 pg_dump upstream | gzip > /backups/upstream_$TIMESTAMP.sql.gz

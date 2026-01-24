@@ -252,7 +252,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Quality Trend Chart
     const trendCtx = document.getElementById('qualityTrendChart').getContext('2d');
-    const trendData = {{ trend_report.daily_quality|safe }};
+    const trendData = {{ trend_report_daily_quality_json }};
 
     new Chart(trendCtx, {
         type: 'line',

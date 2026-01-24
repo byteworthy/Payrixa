@@ -165,7 +165,7 @@ python manage.py test
 ### Run Email Tests Only
 
 ```bash
-python manage.py test payrixa.tests_email
+python manage.py test upstream.tests_email
 ```
 
 ### Test Production Settings

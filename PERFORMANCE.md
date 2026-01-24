@@ -100,7 +100,7 @@ Open http://localhost:8089 to:
 
 ### User Classes
 
-**PayrixaAPIUser** (default)
+**UpstreamAPIUser** (default)
 - Simulates authenticated API users
 - Tests: health, dashboard, drift feed, payer summary, claims
 
@@ -116,10 +116,10 @@ Open http://localhost:8089 to:
 
 ```bash
 # Run only API users
-locust --host=http://localhost:8000 PayrixaAPIUser
+locust --host=http://localhost:8000 UpstreamAPIUser
 
 # Run mix of user types
-locust --host=http://localhost:8000 PayrixaAPIUser AdminUser
+locust --host=http://localhost:8000 UpstreamAPIUser AdminUser
 ```
 
 ### Key Metrics

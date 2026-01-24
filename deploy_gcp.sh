@@ -91,8 +91,6 @@ setup_infrastructure() {
             --database-version=POSTGRES_15 \
             --tier=db-f1-micro \
             --region="$REGION" \
-            --network=default \
-            --no-assign-ip \
             --backup-start-time=03:00
 
         # Create database

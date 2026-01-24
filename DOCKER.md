@@ -113,7 +113,7 @@ docker-compose exec web python manage.py generate_report_artifacts
 docker-compose exec web python manage.py test
 
 # Run specific test module
-docker-compose exec web python manage.py test payrixa.tests_api
+docker-compose exec web python manage.py test upstream.tests_api
 
 # Run with verbosity
 docker-compose exec web python manage.py test --verbosity=2

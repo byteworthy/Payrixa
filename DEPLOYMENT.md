@@ -19,7 +19,7 @@ sudo -u postgres createuser upstream_user --pwprompt
 sudo -u postgres createdb upstream_prod --owner=upstream_user
 
 # 3. Clone and configure
-git clone https://github.com/your-org/payrixa.git /opt/upstream
+git clone https://github.com/your-org/upstream.git /opt/upstream
 cd /opt/upstream
 python3.12 -m venv venv
 source venv/bin/activate
@@ -34,7 +34,7 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 
 # 6. Start with Gunicorn (systemd service recommended - see below)
-gunicorn hello_world.wsgi:application --bind unix:/run/payrixa.sock --workers 4
+gunicorn hello_world.wsgi:application --bind unix:/run/upstream.sock --workers 4
 ```
 
 ---
@@ -165,7 +165,7 @@ python manage.py createsuperuser
 
 ### Gunicorn Systemd Service
 
-Create `/etc/systemd/system/payrixa.service`:
+Create `/etc/systemd/system/upstream.service`:
 
 ```ini
 [Unit]
@@ -181,7 +181,7 @@ EnvironmentFile=/opt/upstream/.env.production
 ExecStart=/opt/upstream/venv/bin/gunicorn \
     --workers 4 \
     --timeout 120 \
-    --bind unix:/run/payrixa.sock \
+    --bind unix:/run/upstream.sock \
     hello_world.wsgi:application
 Restart=on-failure
 
@@ -192,9 +192,9 @@ WantedBy=multi-user.target
 Start the service:
 
 ```bash
-sudo systemctl enable payrixa.service
-sudo systemctl start payrixa.service
-sudo systemctl status payrixa.service
+sudo systemctl enable upstream.service
+sudo systemctl start upstream.service
+sudo systemctl status upstream.service
 ```
 
 ---
@@ -205,7 +205,7 @@ Create `/etc/nginx/sites-available/upstream`:
 
 ```nginx
 upstream upstream_app {
-    server unix:/run/payrixa.sock fail_timeout=0;
+    server unix:/run/upstream.sock fail_timeout=0;
 }
 
 server {
@@ -412,7 +412,7 @@ curl -I https://upstream.cx/static/upstream/css/style.css
 ### Service Status
 
 ```bash
-sudo systemctl status payrixa.service
+sudo systemctl status upstream.service
 sudo systemctl status upstream-beat.service
 sudo systemctl status upstream-worker.service
 sudo systemctl status nginx
@@ -428,7 +428,7 @@ sudo systemctl status redis
 
 ```bash
 # Check logs
-sudo journalctl -u payrixa.service -n 100
+sudo journalctl -u upstream.service -n 100
 
 # Test manually
 cd /opt/upstream
@@ -439,8 +439,8 @@ gunicorn hello_world.wsgi:application --bind 0.0.0.0:8000
 
 ### 502 Bad Gateway
 
-- Check Gunicorn is running: `sudo systemctl status payrixa.service`
-- Check socket exists: `ls -la /run/payrixa.sock`
+- Check Gunicorn is running: `sudo systemctl status upstream.service`
+- Check socket exists: `ls -la /run/upstream.sock`
 - Check Nginx config: `sudo nginx -t`
 
 ### Database Connection Errors
@@ -474,10 +474,10 @@ cat /opt/upstream/.env.production | grep DATABASE_URL
 
 ```bash
 # Restart application
-sudo systemctl restart payrixa.service
+sudo systemctl restart upstream.service
 
 # View logs
-sudo journalctl -u payrixa.service -f
+sudo journalctl -u upstream.service -f
 
 # Manual backup
 sudo /usr/local/bin/upstream-backup.sh

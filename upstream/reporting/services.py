@@ -2,6 +2,7 @@ from typing import Optional, Dict, Any, Union
 import csv
 import os
 import hashlib
+import logging
 from datetime import datetime
 from django.conf import settings
 from django.template.loader import render_to_string
@@ -9,6 +10,8 @@ from django.template import Library
 from weasyprint import HTML
 from upstream.models import DriftEvent, ReportRun
 from .models import ReportArtifact
+
+logger = logging.getLogger(__name__)
 
 # Template filter for percentage calculation
 @Library.filter
@@ -21,7 +24,6 @@ def generate_drift_events_csv(report_run: ReportRun, params: Optional[Dict[str, 
     """Generate CSV export of drift events for a report run."""
     if params is None:
         params = {}
-    artifact = ReportArtifact.objects.create(customer=report_run.customer, report_run=report_run, format='csv', status='processing', params=params)
     try:
         drift_events = DriftEvent.objects.filter(report_run=report_run)
         min_severity = params.get('min_severity')
@@ -41,14 +43,27 @@ def generate_drift_events_csv(report_run: ReportRun, params: Optional[Dict[str, 
             writer.writeheader()
             for event in drift_events:
                 writer.writerow({'payer': event.payer, 'cpt_group': event.cpt_group, 'drift_type': event.drift_type, 'baseline_value': event.baseline_value, 'current_value': event.current_value, 'delta_value': event.delta_value, 'severity': event.severity, 'confidence': event.confidence, 'baseline_start': event.baseline_start, 'baseline_end': event.baseline_end, 'current_start': event.current_start, 'current_end': event.current_end})
-        artifact.file_path = file_path
-        artifact.status = 'completed'
-        artifact.save()
+
+        # Create artifact with generated file
+        artifact = ReportArtifact.objects.create(
+            customer=report_run.customer,
+            report_run=report_run,
+            kind='drift_events_csv',
+            file_path=file_path
+        )
         return artifact
+    except ValueError as e:
+        # Invalid data values (e.g., bad severity filter)
+        logger.error(f"CSV generation failed due to invalid data for report {report_run.id}: {str(e)}")
+        raise ValueError(f"CSV generation failed due to invalid data: {str(e)}")
+    except (IOError, OSError) as e:
+        # File system errors (permissions, disk space, etc.)
+        logger.error(f"CSV generation failed due to file system error for report {report_run.id}: {str(e)}")
+        raise IOError(f"CSV generation failed due to file system error: {str(e)}")
     except Exception as e:
-        artifact.status = 'failed'
-        artifact.save()
-        raise Exception(f"CSV generation failed: {str(e)}")
+        # Unexpected errors - log with full context and re-raise original exception
+        logger.error(f"Unexpected error in CSV generation for report {report_run.id}: {str(e)}", exc_info=True)
+        raise
 
 def generate_weekly_drift_pdf(report_run_id: int) -> ReportArtifact:
     """
@@ -151,7 +166,14 @@ def generate_weekly_drift_pdf(report_run_id: int) -> ReportArtifact:
 
         return artifact
 
-    except ReportRun.DoesNotExist:
-        raise Exception(f"ReportRun with id {report_run_id} not found")
+    except ReportRun.DoesNotExist as e:
+        logger.error(f"ReportRun {report_run_id} not found for PDF generation")
+        raise ReportRun.DoesNotExist(f"ReportRun with id {report_run_id} not found")
+    except IOError as e:
+        # File system errors (permissions, disk space, etc.)
+        logger.error(f"PDF generation failed due to file system error for report {report_run_id}: {str(e)}")
+        raise IOError(f"PDF generation failed due to file system error: {str(e)}")
     except Exception as e:
-        raise Exception(f"PDF generation failed: {str(e)}")
+        # Template errors, WeasyPrint errors, or other unexpected issues
+        logger.error(f"Unexpected error in PDF generation for report {report_run_id}: {str(e)}", exc_info=True)
+        raise

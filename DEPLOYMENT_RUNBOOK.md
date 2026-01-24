@@ -315,7 +315,7 @@ tail -f /var/log/gunicorn/error.log
 redis-cli INFO stats
 
 # Check Django logs
-tail -f /var/log/django/payrixa.log
+tail -f /var/log/django/upstream.log
 
 # System resource usage
 htop

@@ -132,6 +132,20 @@ class UploadsView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
             csv_file = request.FILES['csv_file']
 
+            # H-1 Security Fix: Add file size validation
+            MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+            if csv_file.size > MAX_FILE_SIZE:
+                messages.error(
+                    request,
+                    f"File too large. Maximum size is 100MB (your file: {csv_file.size / (1024*1024):.1f}MB)"
+                )
+                return redirect('uploads')
+
+            # Validate file extension
+            if not csv_file.name.lower().endswith('.csv'):
+                messages.error(request, "Only CSV files are allowed")
+                return redirect('uploads')
+
             # Create upload record with original filename
             upload = Upload.objects.create(
                 customer=customer,
