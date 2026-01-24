@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from upstream.core.models import ProductConfig
+from upstream.core.tenant import customer_context
 from upstream.ingestion.models import SystemEvent
 from upstream.models import Customer, ClaimRecord, Upload, UserProfile
 from upstream.products.denialscope.models import DenialAggregate, DenialSignal
@@ -25,7 +26,7 @@ class DenialScopeTests(TestCase):
             enabled=True
         )
 
-        self.upload = Upload.objects.create(
+        self.upload = Upload.all_objects.create(
             customer=self.customer,
             filename='claims.csv',
             status='success'
@@ -34,7 +35,7 @@ class DenialScopeTests(TestCase):
     def _create_claim(self, payer, outcome, days_ago, denial_reason=None, allowed_amount=100):
         submitted_date = timezone.now().date() - timedelta(days=days_ago)
         decided_date = submitted_date + timedelta(days=2)
-        return ClaimRecord.objects.create(
+        return ClaimRecord.all_objects.create(
             customer=self.customer,
             upload=self.upload,
             payer=payer,
@@ -53,13 +54,14 @@ class DenialScopeTests(TestCase):
         self._create_claim('Aetna', 'DENIED', 6, denial_reason='CO-45')
 
         service = DenialScopeComputationService(self.customer)
-        result = service.compute()
+        with customer_context(self.customer):
+            result = service.compute()
 
-        self.assertGreater(result['aggregates_created'], 0)
-        aggregate = DenialAggregate.objects.filter(customer=self.customer).first()
-        self.assertIsNotNone(aggregate)
-        self.assertEqual(aggregate.payer, 'Aetna')
-        self.assertIn(aggregate.denial_reason, ['CO-45', 'DENIED'])
+            self.assertGreater(result['aggregates_created'], 0)
+            aggregate = DenialAggregate.objects.filter(customer=self.customer).first()
+            self.assertIsNotNone(aggregate)
+            self.assertEqual(aggregate.payer, 'Aetna')
+            self.assertIn(aggregate.denial_reason, ['CO-45', 'DENIED'])
 
     def test_signal_creation_publishes_system_event(self):
         # Baseline window: low denial count
@@ -73,11 +75,12 @@ class DenialScopeTests(TestCase):
             self._create_claim('Cigna', 'PAID', 3)
 
         service = DenialScopeComputationService(self.customer)
-        service.compute(min_volume=10)
+        with customer_context(self.customer):
+            service.compute(min_volume=10)
 
-        self.assertTrue(DenialSignal.objects.filter(customer=self.customer).exists())
-        self.assertTrue(SystemEvent.objects.filter(
-            customer=self.customer,
+            self.assertTrue(DenialSignal.objects.filter(customer=self.customer).exists())
+            self.assertTrue(SystemEvent.objects.filter(
+                customer=self.customer,
             event_type='denialscope_signal_created'
         ).exists())
 
@@ -86,7 +89,8 @@ class DenialScopeTests(TestCase):
         self._create_claim('Aetna', 'PAID', 5)
 
         service = DenialScopeComputationService(self.customer)
-        service.compute()
+        with customer_context(self.customer):
+            service.compute()
 
         response = self.client.get('/portal/products/denialscope/')
         self.assertEqual(response.status_code, 200)
@@ -119,14 +123,14 @@ class DenialScopeTests(TestCase):
     def test_v1_signal_denial_dollars_spike_fires(self):
         """
         V1 deterministic test: Verify denial_dollars_spike signal fires.
-        
+
         This test mirrors the generate_denialscope_test_data pattern:
         - Baseline: low denial rate/dollars over 21 days
         - Recent: high denial rate/dollars over 7 days
         - Expected signal: denial_dollars_spike
         """
         from decimal import Decimal
-        
+
         # Baseline period (21 days): 10% denial rate, ~$1,500 denied
         for day in range(21):
             days_ago = 28 - day  # Days 28-8
@@ -134,7 +138,7 @@ class DenialScopeTests(TestCase):
             for i in range(10):
                 if i == 0:
                     self._create_claim(
-                        'Blue Cross Blue Shield', 'DENIED', days_ago, 
+                        'Blue Cross Blue Shield', 'DENIED', days_ago,
                         denial_reason='CO-197', allowed_amount=150
                     )
                 else:
@@ -142,8 +146,8 @@ class DenialScopeTests(TestCase):
                         'Blue Cross Blue Shield', 'PAID', days_ago,
                         allowed_amount=150
                     )
-        
-        # Recent period (7 days): 50% denial rate, ~$5,250 denied  
+
+        # Recent period (7 days): 50% denial rate, ~$5,250 denied
         for day in range(7):
             days_ago = 7 - day  # Days 7-1
             # 10 claims per day: 5 denied, 5 paid
@@ -158,24 +162,25 @@ class DenialScopeTests(TestCase):
                         'Blue Cross Blue Shield', 'PAID', days_ago,
                         allowed_amount=150
                     )
-        
+
         # Run computation
         service = DenialScopeComputationService(self.customer)
-        result = service.compute(min_volume=5)
-        
-        # Assert at least one signal created
-        signal_count = DenialSignal.objects.filter(customer=self.customer).count()
-        self.assertGreaterEqual(signal_count, 1, 
-            f"Expected at least 1 signal, got {signal_count}. Result: {result}")
-        
-        # Assert denial_dollars_spike is the signal type (V1 primary signal)
-        latest_signal = DenialSignal.objects.filter(
-            customer=self.customer
-        ).order_by('-created_at').first()
-        
-        self.assertIsNotNone(latest_signal)
-        self.assertEqual(latest_signal.signal_type, 'denial_dollars_spike',
-            f"V1 expects denial_dollars_spike, got {latest_signal.signal_type}")
-        self.assertIn(latest_signal.severity, ['critical', 'medium', 'high'],
-            f"Expected severity critical/medium/high, got {latest_signal.severity}")
-        self.assertGreater(latest_signal.confidence, 0.5)
+        with customer_context(self.customer):
+            result = service.compute(min_volume=5)
+
+            # Assert at least one signal created
+            signal_count = DenialSignal.objects.filter(customer=self.customer).count()
+            self.assertGreaterEqual(signal_count, 1,
+                f"Expected at least 1 signal, got {signal_count}. Result: {result}")
+
+            # Assert denial_dollars_spike is the signal type (V1 primary signal)
+            latest_signal = DenialSignal.objects.filter(
+                customer=self.customer
+            ).order_by('-created_at').first()
+
+            self.assertIsNotNone(latest_signal)
+            self.assertEqual(latest_signal.signal_type, 'denial_dollars_spike',
+                f"V1 expects denial_dollars_spike, got {latest_signal.signal_type}")
+            self.assertIn(latest_signal.severity, ['critical', 'medium', 'high'],
+                f"Expected severity critical/medium/high, got {latest_signal.severity}")
+            self.assertGreater(latest_signal.confidence, 0.5)

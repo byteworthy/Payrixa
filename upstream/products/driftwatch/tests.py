@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from upstream.core.models import ProductConfig
+from upstream.core.tenant import customer_context
 from upstream.models import Customer, ClaimRecord, Upload, UserProfile, DriftEvent, ReportRun
 from upstream.services.payer_drift import compute_weekly_payer_drift
 from upstream.products.driftwatch import DRIFTWATCH_V1_EVENT_TYPE
@@ -34,7 +35,7 @@ class DriftWatchTests(TestCase):
             enabled=True
         )
 
-        self.upload = Upload.objects.create(
+        self.upload = Upload.all_objects.create(
             customer=self.customer,
             filename='drift_claims.csv',
             status='success'
@@ -44,7 +45,7 @@ class DriftWatchTests(TestCase):
         """Helper to create claims for drift testing."""
         submitted_date = timezone.now().date() - timedelta(days=days_ago)
         decided_date = submitted_date + timedelta(days=3)
-        return ClaimRecord.objects.create(
+        return ClaimRecord.all_objects.create(
             customer=self.customer,
             upload=self.upload,
             payer=payer,
@@ -78,32 +79,33 @@ class DriftWatchTests(TestCase):
                 self._create_claim('Blue Cross Blue Shield', outcome, days_ago, 'E&M')
 
         # Run drift computation using existing service
-        report_run = compute_weekly_payer_drift(
-            customer=self.customer,
-            baseline_days=90,
-            current_days=14,
-            min_volume=30
-        )
+        with customer_context(self.customer):
+            report_run = compute_weekly_payer_drift(
+                customer=self.customer,
+                baseline_days=90,
+                current_days=14,
+                min_volume=30
+            )
 
-        # Assert report run succeeded
-        self.assertEqual(report_run.status, 'success')
+            # Assert report run succeeded
+            self.assertEqual(report_run.status, 'success')
 
-        # Assert at least one DriftEvent was created
-        drift_event_count = DriftEvent.objects.filter(customer=self.customer).count()
-        self.assertGreaterEqual(drift_event_count, 1,
-            f"Expected at least 1 DriftEvent, got {drift_event_count}")
+            # Assert at least one DriftEvent was created
+            drift_event_count = DriftEvent.objects.filter(customer=self.customer).count()
+            self.assertGreaterEqual(drift_event_count, 1,
+                f"Expected at least 1 DriftEvent, got {drift_event_count}")
 
-        # Assert DENIAL_RATE drift type exists (V1 signal)
-        denial_rate_event = DriftEvent.objects.filter(
-            customer=self.customer,
-            drift_type='DENIAL_RATE'
-        ).first()
-        
-        self.assertIsNotNone(denial_rate_event,
-            "Expected DriftEvent with drift_type='DENIAL_RATE' (V1 volume spike signal)")
-        
-        self.assertGreater(denial_rate_event.delta_value, 0.1)
-        self.assertGreater(denial_rate_event.severity, 0.0)
+            # Assert DENIAL_RATE drift type exists (V1 signal)
+            denial_rate_event = DriftEvent.objects.filter(
+                customer=self.customer,
+                drift_type='DENIAL_RATE'
+            ).first()
+
+            self.assertIsNotNone(denial_rate_event,
+                "Expected DriftEvent with drift_type='DENIAL_RATE' (V1 volume spike signal)")
+
+            self.assertGreater(denial_rate_event.delta_value, 0.1)
+            self.assertGreater(denial_rate_event.severity, 0.0)
 
     def test_dashboard_renders_with_data(self):
         """Test DriftWatch dashboard renders correctly."""
@@ -119,7 +121,8 @@ class DriftWatchTests(TestCase):
                 outcome = 'DENIED' if i < 3 else 'PAID'
                 self._create_claim('Aetna', outcome, days_ago, 'SURGERY')
 
-        compute_weekly_payer_drift(self.customer, min_volume=20)
+        with customer_context(self.customer):
+            compute_weekly_payer_drift(self.customer, min_volume=20)
 
         response = self.client.get('/portal/products/driftwatch/')
         self.assertEqual(response.status_code, 200)
@@ -127,13 +130,13 @@ class DriftWatchTests(TestCase):
 
     def test_no_new_models_created(self):
         """Verify DriftWatch uses only existing models - no new migrations needed."""
-        report_run = ReportRun.objects.create(
+        report_run = ReportRun.all_objects.create(
             customer=self.customer,
             run_type='weekly',
             status='success'
         )
-        
-        drift_event = DriftEvent.objects.create(
+
+        drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=report_run,
             payer='Test Payer',
@@ -149,7 +152,7 @@ class DriftWatchTests(TestCase):
             current_start=timezone.now().date() - timedelta(days=14),
             current_end=timezone.now().date(),
         )
-        
+
         self.assertIsNotNone(drift_event.id)
         self.assertEqual(drift_event.drift_type, DRIFTWATCH_V1_EVENT_TYPE)
 
@@ -167,19 +170,20 @@ class DriftWatchTests(TestCase):
         """Verify deterministic demo command creates DENIAL_RATE events."""
         from django.core.management import call_command
         from io import StringIO
-        
+
         out = StringIO()
         call_command('generate_driftwatch_demo', '--customer', self.customer.id, stdout=out)
-        
+
         # Verify output
         output = out.getvalue()
         self.assertIn('Created', output)
-        
+
         # Verify events created
-        demo_events = DriftEvent.objects.filter(
-            customer=self.customer,
-            drift_type=DRIFTWATCH_V1_EVENT_TYPE,
-            payer__startswith='Demo-'
-        )
-        self.assertGreaterEqual(demo_events.count(), 1,
-            f"Expected at least 1 demo DriftEvent, got {demo_events.count()}")
+        with customer_context(self.customer):
+            demo_events = DriftEvent.objects.filter(
+                customer=self.customer,
+                drift_type=DRIFTWATCH_V1_EVENT_TYPE,
+                payer__startswith='Demo-'
+            )
+            self.assertGreaterEqual(demo_events.count(), 1,
+                f"Expected at least 1 demo DriftEvent, got {demo_events.count()}")

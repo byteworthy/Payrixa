@@ -4,6 +4,7 @@ Tests for export functionality.
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from upstream.core.tenant import customer_context
 from upstream.models import Customer, UserProfile, ReportRun, DriftEvent
 from upstream.alerts.models import AlertRule, AlertEvent
 from upstream.exports.services import ExportService
@@ -18,9 +19,9 @@ class ExportServiceTests(TestCase):
         self.customer = Customer.objects.create(name='Test Customer')
         self.user = User.objects.create_user(username='testuser', password='pass')
         UserProfile.objects.create(user=self.user, customer=self.customer, role='owner')
-        
+
         # Create report run
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             run_type='weekly',
             status='success',
@@ -31,10 +32,10 @@ class ExportServiceTests(TestCase):
                 'current_end': '2024-02-28'
             }
         )
-        
+
         # Create drift events
         for i in range(5):
-            DriftEvent.objects.create(
+            DriftEvent.all_objects.create(
                 customer=self.customer,
                 report_run=self.report_run,
                 payer=f'Payer{i}',
@@ -50,16 +51,16 @@ class ExportServiceTests(TestCase):
                 current_start=datetime(2024, 2, 1).date(),
                 current_end=datetime(2024, 2, 28).date()
             )
-        
+
         # Create alert rule and events
-        self.alert_rule = AlertRule.objects.create(
+        self.alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name='Test Alert',
             threshold_value=0.5
         )
-        
+
         for i in range(3):
-            AlertEvent.objects.create(
+            AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 status='sent',
@@ -74,80 +75,84 @@ class ExportServiceTests(TestCase):
     def test_export_drift_events_excel(self):
         """Test exporting drift events to Excel."""
         export_service = ExportService(self.customer)
-        excel_file = export_service.export_drift_events_excel(self.report_run)
-        
+        with customer_context(self.customer):
+            excel_file = export_service.export_drift_events_excel(self.report_run)
+
         # Verify it's a BytesIO object
         self.assertIsInstance(excel_file, BytesIO)
-        
+
         # Load workbook and verify structure
         wb = load_workbook(excel_file)
         ws = wb.active
-        
+
         # Check headers
         headers = [cell.value for cell in ws[1]]
         self.assertIn('Payer', headers)
         self.assertIn('CPT Group', headers)
         self.assertIn('Severity', headers)
-        
+
         # Check data rows (5 events + 1 header)
         self.assertEqual(ws.max_row, 6)
     
     def test_export_drift_events_with_filters(self):
         """Test exporting drift events with filters."""
         export_service = ExportService(self.customer)
-        
+
         # Filter by min_severity
-        excel_file = export_service.export_drift_events_excel(
-            self.report_run,
-            filters={'min_severity': 0.7}
-        )
-        
+        with customer_context(self.customer):
+            excel_file = export_service.export_drift_events_excel(
+                self.report_run,
+                filters={'min_severity': 0.7}
+            )
+
         wb = load_workbook(excel_file)
         ws = wb.active
-        
+
         # Should have fewer rows (only high severity)
         self.assertLess(ws.max_row, 6)
     
     def test_export_alert_events_excel(self):
         """Test exporting alert events to Excel."""
         export_service = ExportService(self.customer)
-        excel_file = export_service.export_alert_events_excel()
-        
+        with customer_context(self.customer):
+            excel_file = export_service.export_alert_events_excel()
+
         # Verify it's a BytesIO object
         self.assertIsInstance(excel_file, BytesIO)
-        
+
         # Load workbook and verify structure
         wb = load_workbook(excel_file)
         ws = wb.active
-        
+
         # Check headers
         headers = [cell.value for cell in ws[1]]
         self.assertIn('Alert Rule', headers)
         self.assertIn('Severity', headers)
         self.assertIn('Status', headers)
-        
+
         # Check data rows (3 events + 1 header)
         self.assertEqual(ws.max_row, 4)
     
     def test_export_weekly_summary_excel(self):
         """Test exporting weekly summary to Excel with multiple sheets."""
         export_service = ExportService(self.customer)
-        excel_file = export_service.export_weekly_summary_excel(self.report_run)
-        
+        with customer_context(self.customer):
+            excel_file = export_service.export_weekly_summary_excel(self.report_run)
+
         # Verify it's a BytesIO object
         self.assertIsInstance(excel_file, BytesIO)
-        
+
         # Load workbook and verify structure
         wb = load_workbook(excel_file)
-        
+
         # Should have 2 sheets
         self.assertIn('Summary', wb.sheetnames)
         self.assertIn('Drift Events', wb.sheetnames)
-        
+
         # Check summary sheet
         ws_summary = wb['Summary']
         self.assertEqual(ws_summary['A1'].value, 'Weekly Drift Report Summary')
-        
+
         # Check drift events sheet
         ws_details = wb['Drift Events']
         headers = [cell.value for cell in ws_details[1]]
@@ -158,17 +163,18 @@ class ExportServiceTests(TestCase):
         # Create new customer with no data
         empty_customer = Customer.objects.create(name='Empty Customer')
         export_service = ExportService(empty_customer)
-        
+
         # Create empty report run
-        empty_report = ReportRun.objects.create(
+        empty_report = ReportRun.all_objects.create(
             customer=empty_customer,
             run_type='weekly',
             status='success',
             summary_json={}
         )
-        
-        excel_file = export_service.export_drift_events_excel(empty_report)
-        
+
+        with customer_context(empty_customer):
+            excel_file = export_service.export_drift_events_excel(empty_report)
+
         # Should still create valid Excel file with just headers
         wb = load_workbook(excel_file)
         ws = wb.active
@@ -177,34 +183,35 @@ class ExportServiceTests(TestCase):
     def test_log_export_creates_audit_event(self):
         """Test that log_export creates an audit trail."""
         from upstream.core.models import DomainAuditEvent
-        
+
         export_service = ExportService(self.customer)
-        export_service.log_export(self.user, 'drift_events', 5)
-        
-        # Verify audit event was created
-        audit_events = DomainAuditEvent.objects.filter(
-            customer=self.customer,
-            action='report_exported',
-            user=self.user
-        )
-        
-        self.assertEqual(audit_events.count(), 1)
-        audit_event = audit_events.first()
-        self.assertEqual(audit_event.metadata['export_type'], 'drift_events')
-        self.assertEqual(audit_event.metadata['record_count'], 5)
+        with customer_context(self.customer):
+            export_service.log_export(self.user, 'drift_events', 5)
+
+            # Verify audit event was created
+            audit_events = DomainAuditEvent.objects.filter(
+                customer=self.customer,
+                action='report_exported',
+                user=self.user
+            )
+
+            self.assertEqual(audit_events.count(), 1)
+            audit_event = audit_events.first()
+            self.assertEqual(audit_event.metadata['export_type'], 'drift_events')
+            self.assertEqual(audit_event.metadata['record_count'], 5)
     
     def test_customer_isolation(self):
         """Test that exports are scoped to customer."""
         # Create second customer with data
         customer2 = Customer.objects.create(name='Customer 2')
-        report_run2 = ReportRun.objects.create(
+        report_run2 = ReportRun.all_objects.create(
             customer=customer2,
             run_type='weekly',
             status='success',
             summary_json={}
         )
-        
-        DriftEvent.objects.create(
+
+        DriftEvent.all_objects.create(
             customer=customer2,
             report_run=report_run2,
             payer='Other Payer',
@@ -220,17 +227,18 @@ class ExportServiceTests(TestCase):
             current_start=datetime(2024, 2, 1).date(),
             current_end=datetime(2024, 2, 28).date()
         )
-        
+
         # Export for customer1 should not include customer2 data
         export_service = ExportService(self.customer)
-        excel_file = export_service.export_drift_events_excel(self.report_run)
-        
+        with customer_context(self.customer):
+            excel_file = export_service.export_drift_events_excel(self.report_run)
+
         wb = load_workbook(excel_file)
         ws = wb.active
-        
+
         # Should only have customer1's 5 events
         self.assertEqual(ws.max_row, 6)
-        
+
         # Verify no customer2 data
         for row in ws.iter_rows(min_row=2, values_only=True):
             self.assertNotEqual(row[0], 'Other Payer')
