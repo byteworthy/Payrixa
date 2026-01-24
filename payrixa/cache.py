@@ -51,7 +51,7 @@ def get_cache_key(prefix, *args, **kwargs):
 
     # Hash if too long (Redis key limit is 512MB but shorter is better)
     if len(cache_key) > 200:
-        hash_suffix = hashlib.md5(cache_key.encode()).hexdigest()[:8]
+        hash_suffix = hashlib.sha256(cache_key.encode()).hexdigest()[:16]
         cache_key = f"{prefix}:{hash_suffix}"
 
     return cache_key
