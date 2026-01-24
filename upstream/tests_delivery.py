@@ -9,6 +9,7 @@ from datetime import timedelta
 from unittest.mock import patch, Mock
 import json
 
+from upstream.core.tenant import customer_context
 from upstream.models import Customer, DriftEvent, ReportRun
 from upstream.alerts.models import AlertRule, AlertEvent, NotificationChannel
 from upstream.alerts.services import evaluate_drift_event, send_alert_notification, process_pending_alerts
@@ -23,9 +24,9 @@ class AlertDeliveryTests(TestCase):
     def setUp(self):
         self.customer = Customer.objects.create(name='Test Customer')
         self.user = User.objects.create_user(username='testuser', password='testpass')
-        
+
         # Create a report run with summary_json
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             run_type='weekly',
             status='success',
@@ -36,9 +37,9 @@ class AlertDeliveryTests(TestCase):
                 'current_end': '2026-01-14'
             }
         )
-        
+
         # Create a drift event
-        self.drift_event = DriftEvent.objects.create(
+        self.drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer='UnitedHealthcare',
@@ -54,9 +55,9 @@ class AlertDeliveryTests(TestCase):
             current_start=timezone.now().date() - timedelta(days=14),
             current_end=timezone.now().date()
         )
-        
+
         # Create an alert rule that will trigger
-        self.alert_rule = AlertRule.objects.create(
+        self.alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name='High Denial Rate Alert',
             metric='severity',
@@ -68,35 +69,37 @@ class AlertDeliveryTests(TestCase):
     
     def test_drift_event_creates_alert_event(self):
         """Test that DriftEvent above threshold creates AlertEvent."""
-        alert_events = evaluate_drift_event(self.drift_event)
-        
-        # Should create one alert event
-        self.assertEqual(len(alert_events), 1)
-        self.assertEqual(AlertEvent.objects.count(), 1)
-        
-        alert_event = alert_events[0]
-        self.assertEqual(alert_event.customer, self.customer)
-        self.assertEqual(alert_event.alert_rule, self.alert_rule)
-        self.assertEqual(alert_event.drift_event, self.drift_event)
-        self.assertEqual(alert_event.status, 'pending')
-        self.assertEqual(alert_event.payload['payer'], 'UnitedHealthcare')
+        with customer_context(self.customer):
+            alert_events = evaluate_drift_event(self.drift_event)
+
+            # Should create one alert event
+            self.assertEqual(len(alert_events), 1)
+            self.assertEqual(AlertEvent.objects.count(), 1)
+
+            alert_event = alert_events[0]
+            self.assertEqual(alert_event.customer, self.customer)
+            self.assertEqual(alert_event.alert_rule, self.alert_rule)
+            self.assertEqual(alert_event.drift_event, self.drift_event)
+            self.assertEqual(alert_event.status, 'pending')
+            self.assertEqual(alert_event.payload['payer'], 'UnitedHealthcare')
     
     def test_duplicate_alert_event_prevention(self):
         """Test that duplicate AlertEvents are not created for same drift event and rule."""
-        # Create first alert event
-        alert_events_1 = evaluate_drift_event(self.drift_event)
-        self.assertEqual(len(alert_events_1), 1)
-        
-        # Try to create again - should return existing, not create new
-        alert_events_2 = evaluate_drift_event(self.drift_event)
-        self.assertEqual(len(alert_events_2), 1)
-        self.assertEqual(AlertEvent.objects.count(), 1)  # Still only 1
-        self.assertEqual(alert_events_1[0].id, alert_events_2[0].id)  # Same ID
+        with customer_context(self.customer):
+            # Create first alert event
+            alert_events_1 = evaluate_drift_event(self.drift_event)
+            self.assertEqual(len(alert_events_1), 1)
+
+            # Try to create again - should return existing, not create new
+            alert_events_2 = evaluate_drift_event(self.drift_event)
+            self.assertEqual(len(alert_events_2), 1)
+            self.assertEqual(AlertEvent.objects.count(), 1)  # Still only 1
+            self.assertEqual(alert_events_1[0].id, alert_events_2[0].id)  # Same ID
     
     def test_alert_sent_via_console_backend(self):
         """Test that AlertEvent is sent using console backend with HTML and PDF."""
         # Create alert event
-        alert_event = AlertEvent.objects.create(
+        alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -104,18 +107,19 @@ class AlertDeliveryTests(TestCase):
             status='pending',
             payload={'payer': 'UnitedHealthcare', 'severity': 0.8}
         )
-        
+
         # Send the alert
-        success = send_alert_notification(alert_event)
+        with customer_context(self.customer):
+            success = send_alert_notification(alert_event)
         
-        # Check success
-        self.assertTrue(success)
-        
-        # Reload from DB
-        alert_event.refresh_from_db()
-        self.assertEqual(alert_event.status, 'sent')
-        self.assertIsNotNone(alert_event.notification_sent_at)
-        self.assertIsNone(alert_event.error_message)
+            # Check success
+            self.assertTrue(success)
+
+            # Reload from DB
+            alert_event.refresh_from_db()
+            self.assertEqual(alert_event.status, 'sent')
+            self.assertIsNotNone(alert_event.notification_sent_at)
+            self.assertIsNone(alert_event.error_message)
         
         # Check email was sent (console backend)
         self.assertEqual(len(mail.outbox), 1)
@@ -142,7 +146,7 @@ class AlertDeliveryTests(TestCase):
     
     def test_failed_send_updates_status(self):
         """Test that failed sends update status correctly."""
-        alert_event = AlertEvent.objects.create(
+        alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -150,23 +154,24 @@ class AlertDeliveryTests(TestCase):
             status='pending',
             payload={'payer': 'UnitedHealthcare'}
         )
-        
+
         # Mock EmailMultiAlternatives.send to raise exception
         with patch('upstream.alerts.services.EmailMultiAlternatives.send', side_effect=Exception('SMTP Error')):
-            success = send_alert_notification(alert_event)
-            
-            # Check failure
-            self.assertFalse(success)
-            
-            # Reload from DB
-            alert_event.refresh_from_db()
-            self.assertEqual(alert_event.status, 'failed')
-            self.assertIn('SMTP Error', alert_event.error_message)
-            self.assertIsNone(alert_event.notification_sent_at)
+            with customer_context(self.customer):
+                success = send_alert_notification(alert_event)
+
+                # Check failure
+                self.assertFalse(success)
+
+                # Reload from DB
+                alert_event.refresh_from_db()
+                self.assertEqual(alert_event.status, 'failed')
+                self.assertIn('SMTP Error', alert_event.error_message)
+                self.assertIsNone(alert_event.notification_sent_at)
     
     def test_resend_skips_sent_alerts(self):
         """Test that re-running sender does not resend sent alerts (idempotency)."""
-        alert_event = AlertEvent.objects.create(
+        alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -174,31 +179,32 @@ class AlertDeliveryTests(TestCase):
             status='pending',
             payload={'payer': 'UnitedHealthcare'}
         )
-        
-        # Send first time
-        send_alert_notification(alert_event)
-        alert_event.refresh_from_db()
-        first_sent_at = alert_event.notification_sent_at
-        
-        # Clear mail outbox
-        mail.outbox = []
-        
-        # Try to send again - should skip
-        success = send_alert_notification(alert_event)
-        self.assertTrue(success)  # Returns true but doesn't actually send
-        
-        # No new email sent
-        self.assertEqual(len(mail.outbox), 0)
-        
-        # Timestamp unchanged
-        alert_event.refresh_from_db()
-        self.assertEqual(alert_event.notification_sent_at, first_sent_at)
+
+        with customer_context(self.customer):
+            # Send first time
+            send_alert_notification(alert_event)
+            alert_event.refresh_from_db()
+            first_sent_at = alert_event.notification_sent_at
+
+            # Clear mail outbox
+            mail.outbox = []
+
+            # Try to send again - should skip
+            success = send_alert_notification(alert_event)
+            self.assertTrue(success)  # Returns true but doesn't actually send
+
+            # No new email sent
+            self.assertEqual(len(mail.outbox), 0)
+
+            # Timestamp unchanged
+            alert_event.refresh_from_db()
+            self.assertEqual(alert_event.notification_sent_at, first_sent_at)
     
     def test_process_pending_alerts(self):
         """Test process_pending_alerts command."""
         # Create multiple pending alerts
         for i in range(3):
-            AlertEvent.objects.create(
+            AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 drift_event=self.drift_event,
@@ -206,37 +212,39 @@ class AlertDeliveryTests(TestCase):
                 status='pending',
                 payload={'payer': f'Payer{i}'}
             )
-        
+
         # Process all
-        results = process_pending_alerts()
-        
-        self.assertEqual(results['total'], 3)
-        self.assertEqual(results['sent'], 3)
-        self.assertEqual(results['failed'], 0)
-        
-        # All should be marked sent
-        self.assertEqual(AlertEvent.objects.filter(status='sent').count(), 3)
+        with customer_context(self.customer):
+            results = process_pending_alerts()
+
+            self.assertEqual(results['total'], 3)
+            self.assertEqual(results['sent'], 3)
+            self.assertEqual(results['failed'], 0)
+
+            # All should be marked sent
+            self.assertEqual(AlertEvent.objects.filter(status='sent').count(), 3)
     
     def test_audit_event_on_alert_creation(self):
         """Test that DomainAuditEvent is created when AlertEvent is created."""
-        # Clear any existing audit events
-        DomainAuditEvent.objects.all().delete()
-        
-        # Create alert event
-        alert_events = evaluate_drift_event(self.drift_event)
-        
-        # Check audit event created
-        audit_events = DomainAuditEvent.objects.filter(action='alert_event_created')
-        self.assertEqual(audit_events.count(), 1)
-        
-        audit_event = audit_events.first()
-        self.assertEqual(audit_event.entity_type, 'AlertEvent')
-        self.assertEqual(audit_event.entity_id, str(alert_events[0].id))
-        self.assertEqual(audit_event.customer, self.customer)
+        with customer_context(self.customer):
+            # Clear any existing audit events
+            DomainAuditEvent.objects.all().delete()
+
+            # Create alert event
+            alert_events = evaluate_drift_event(self.drift_event)
+
+            # Check audit event created
+            audit_events = DomainAuditEvent.objects.filter(action='alert_event_created')
+            self.assertEqual(audit_events.count(), 1)
+
+            audit_event = audit_events.first()
+            self.assertEqual(audit_event.entity_type, 'AlertEvent')
+            self.assertEqual(audit_event.entity_id, str(alert_events[0].id))
+            self.assertEqual(audit_event.customer, self.customer)
     
     def test_audit_event_on_alert_send(self):
         """Test that DomainAuditEvent is created when AlertEvent is sent."""
-        alert_event = AlertEvent.objects.create(
+        alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -244,16 +252,17 @@ class AlertDeliveryTests(TestCase):
             status='pending',
             payload={'payer': 'UnitedHealthcare'}
         )
-        
-        # Clear audit events
-        DomainAuditEvent.objects.all().delete()
-        
-        # Send alert
-        send_alert_notification(alert_event)
-        
-        # Check audit event created for send
-        audit_events = DomainAuditEvent.objects.filter(action='alert_event_sent')
-        self.assertEqual(audit_events.count(), 1)
+
+        with customer_context(self.customer):
+            # Clear audit events
+            DomainAuditEvent.objects.all().delete()
+
+            # Send alert
+            send_alert_notification(alert_event)
+
+            # Check audit event created for send
+            audit_events = DomainAuditEvent.objects.filter(action='alert_event_sent')
+            self.assertEqual(audit_events.count(), 1)
     
     def test_suppression_window_prevents_duplicate_sends(self):
         """
@@ -266,7 +275,7 @@ class AlertDeliveryTests(TestCase):
         from datetime import timedelta
         
         # Create alert event with same product_name, signal_type, entity_label
-        alert_event1 = AlertEvent.objects.create(
+        alert_event1 = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -280,17 +289,18 @@ class AlertDeliveryTests(TestCase):
                 'severity': 0.8,
             }
         )
-        
-        # Send first alert
-        success1 = send_alert_notification(alert_event1)
-        self.assertTrue(success1)
-        alert_event1.refresh_from_db()
-        self.assertEqual(alert_event1.status, 'sent')
-        self.assertIsNone(alert_event1.error_message)
-        self.assertEqual(len(mail.outbox), 1)
-        
+
+        with customer_context(self.customer):
+            # Send first alert
+            success1 = send_alert_notification(alert_event1)
+            self.assertTrue(success1)
+            alert_event1.refresh_from_db()
+            self.assertEqual(alert_event1.status, 'sent')
+            self.assertIsNone(alert_event1.error_message)
+            self.assertEqual(len(mail.outbox), 1)
+
         # Create second alert event with same payload fingerprint (same product, signal, entity)
-        second_drift = DriftEvent.objects.create(
+        second_drift = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer='UnitedHealthcare',  # Same payer = same entity_label
@@ -306,8 +316,8 @@ class AlertDeliveryTests(TestCase):
             current_start=timezone.now().date() - timedelta(days=14),
             current_end=timezone.now().date()
         )
-        
-        alert_event2 = AlertEvent.objects.create(
+
+        alert_event2 = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=second_drift,
@@ -321,20 +331,21 @@ class AlertDeliveryTests(TestCase):
                 'severity': 0.75,
             }
         )
-        
+
         # Clear mail outbox
         mail.outbox = []
-        
-        # Send second alert (should be suppressed)
-        success2 = send_alert_notification(alert_event2)
-        self.assertTrue(success2)  # Returns True but was suppressed
-        
-        alert_event2.refresh_from_db()
-        self.assertEqual(alert_event2.status, 'sent')  # Marked as sent
-        self.assertEqual(alert_event2.error_message, 'suppressed')  # Suppression marker
-        
-        # No new email sent (suppressed)
-        self.assertEqual(len(mail.outbox), 0)
+
+        with customer_context(self.customer):
+            # Send second alert (should be suppressed)
+            success2 = send_alert_notification(alert_event2)
+            self.assertTrue(success2)  # Returns True but was suppressed
+
+            alert_event2.refresh_from_db()
+            self.assertEqual(alert_event2.status, 'sent')  # Marked as sent
+            self.assertEqual(alert_event2.error_message, 'suppressed')  # Suppression marker
+
+            # No new email sent (suppressed)
+            self.assertEqual(len(mail.outbox), 0)
     
     def test_pdf_artifact_not_duplicated_on_resend(self):
         """Test that PDF artifacts are not duplicated when reprocessing alerts."""
