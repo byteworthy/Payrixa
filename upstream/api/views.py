@@ -45,23 +45,27 @@ class CustomerFilterMixin:
     """
     Mixin to automatically filter querysets to the user's customer.
     """
-    
+
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        
+
         # Superusers see all data
         if user.is_superuser:
-            return queryset
-        
+            return queryset.model.objects.unscoped() if hasattr(queryset.model.objects, 'unscoped') else queryset
+
         # Regular users only see their customer's data
         customer = get_user_customer(user)
         if customer is None:
             return queryset.none()
-        
-        # Filter by customer field
+
+        # Filter by customer field - use for_customer() to avoid double-filtering with tenant isolation
         if hasattr(queryset.model, 'customer'):
-            return queryset.filter(customer=customer)
+            # Use for_customer() which bypasses auto-filtering and explicitly filters
+            if hasattr(queryset.model.objects, 'for_customer'):
+                return queryset.model.objects.for_customer(customer)
+            else:
+                return queryset.filter(customer=customer)
         
         return queryset
 
@@ -396,13 +400,12 @@ class DashboardView(APIView):
 
         def compute_dashboard_data():
             """Expensive dashboard queries - cached to reduce DB load."""
-            # Get counts
-            total_claims = ClaimRecord.objects.filter(customer=customer).count()
-            total_uploads = Upload.objects.filter(customer=customer, status='success').count()
+            # Get counts - use for_customer() to bypass auto-filtering and explicitly filter
+            total_claims = ClaimRecord.objects.for_customer(customer).count()
+            total_uploads = Upload.objects.for_customer(customer).filter(status='success').count()
 
             # Get latest report
-            latest_report = ReportRun.objects.filter(
-                customer=customer,
+            latest_report = ReportRun.objects.for_customer(customer).filter(
                 status='success'
             ).order_by('-finished_at').first()
 
@@ -428,8 +431,7 @@ class DashboardView(APIView):
             denial_rate_trend = []
             six_months_ago = timezone.now().date() - timedelta(days=180)
 
-            trend_data = ClaimRecord.objects.filter(
-                customer=customer,
+            trend_data = ClaimRecord.objects.for_customer(customer).filter(
                 decided_date__gte=six_months_ago
             ).annotate(
                 month=TruncMonth('decided_date')

@@ -84,18 +84,18 @@ class APITestBase(APITestCase):
     
     def create_upload_for_customer(self, customer):
         """Helper to create an upload for a customer."""
-        return Upload.objects.create(
+        return Upload.all_objects.create(
             customer=customer,
             filename='test.csv',
             status='success',
             row_count=100
         )
-    
+
     def create_claim_record_for_customer(self, customer, upload=None):
         """Helper to create a claim record for a customer."""
         if upload is None:
             upload = self.create_upload_for_customer(customer)
-        return ClaimRecord.objects.create(
+        return ClaimRecord.all_objects.create(
             customer=customer,
             upload=upload,
             payer='TestPayer',
@@ -106,10 +106,10 @@ class APITestBase(APITestCase):
             outcome='PAID',
             allowed_amount=100.00
         )
-    
+
     def create_report_run_for_customer(self, customer):
         """Helper to create a report run for a customer."""
-        return ReportRun.objects.create(
+        return ReportRun.all_objects.create(
             customer=customer,
             run_type='weekly',
             status='success',
@@ -117,12 +117,12 @@ class APITestBase(APITestCase):
             finished_at=timezone.now(),
             summary_json={'events_created': 1}
         )
-    
+
     def create_drift_event_for_customer(self, customer, report_run=None):
         """Helper to create a drift event for a customer."""
         if report_run is None:
             report_run = self.create_report_run_for_customer(customer)
-        return DriftEvent.objects.create(
+        return DriftEvent.all_objects.create(
             customer=customer,
             report_run=report_run,
             payer='TestPayer',
@@ -243,16 +243,24 @@ class DashboardEndpointTests(APITestBase):
         self.assertIn('top_drift_payers', response.data)
     
     def test_dashboard_shows_customer_data_only(self):
-        """Dashboard should only show data for user's customer."""
+        """Dashboard should only see data for user's customer."""
         # Create data for both customers
-        self.create_upload_for_customer(self.customer_a)
-        self.create_upload_for_customer(self.customer_a)
-        self.create_upload_for_customer(self.customer_b)
-        
+        u1 = self.create_upload_for_customer(self.customer_a)
+        u2 = self.create_upload_for_customer(self.customer_a)
+        u3 = self.create_upload_for_customer(self.customer_b)
+
+        # Verify uploads were created
+        total_uploads = Upload.all_objects.count()
+        self.assertEqual(total_uploads, 3, f"Expected 3 uploads, got {total_uploads}")
+
+        customer_a_uploads = Upload.all_objects.filter(customer=self.customer_a).count()
+        self.assertEqual(customer_a_uploads, 2, f"Expected 2 uploads for customer A, got {customer_a_uploads}")
+
         self.authenticate_as(self.user_a)
         response = self.client.get(f'{API_BASE}/dashboard/')
-        
+
         # User A should only see Customer A's uploads
+        self.assertEqual(response.status_code, 200, f"Expected 200, got {response.status_code}: {response.data}")
         self.assertEqual(response.data['total_uploads'], 2)
 
 
