@@ -505,7 +505,8 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         validated_data = feedback_serializer.validated_data
 
         # Create or update operator judgment
-        judgment, created = OperatorJudgment.objects.update_or_create(
+        # Use all_objects to avoid double-filtering issues with update_or_create
+        judgment, created = OperatorJudgment.all_objects.update_or_create(
             alert_event=alert_event,
             operator=request.user,
             defaults={

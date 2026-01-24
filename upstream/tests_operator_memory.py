@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from decimal import Decimal
 
+from upstream.core.tenant import customer_context
 from upstream.models import Customer, DriftEvent, ReportRun
 from upstream.alerts.models import AlertRule, AlertEvent, NotificationChannel, OperatorJudgment
 from upstream.core.models import ProductConfig
@@ -24,13 +25,13 @@ class OperatorJudgmentModelTest(TestCase):
         self.user = User.objects.create_user(username="operator", password="testpass")
 
         # Create report run and drift event
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             run_type='weekly',
             status='success'
         )
 
-        self.drift_event = DriftEvent.objects.create(
+        self.drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer="Test Payer",
@@ -48,7 +49,7 @@ class OperatorJudgmentModelTest(TestCase):
         )
 
         # Create alert rule and event
-        self.alert_rule = AlertRule.objects.create(
+        self.alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name="High Severity Alert",
             metric="severity",
@@ -56,7 +57,7 @@ class OperatorJudgmentModelTest(TestCase):
             severity="critical"
         )
 
-        self.alert_event = AlertEvent.objects.create(
+        self.alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -67,7 +68,7 @@ class OperatorJudgmentModelTest(TestCase):
 
     def test_create_operator_judgment(self):
         """Test creating an operator judgment on an alert."""
-        judgment = OperatorJudgment.objects.create(
+        judgment = OperatorJudgment.all_objects.create(
             customer=self.customer,
             alert_event=self.alert_event,
             verdict='noise',
@@ -81,7 +82,7 @@ class OperatorJudgmentModelTest(TestCase):
 
     def test_judgment_with_recovery_amount(self):
         """Test creating a judgment with recovered amount."""
-        judgment = OperatorJudgment.objects.create(
+        judgment = OperatorJudgment.all_objects.create(
             customer=self.customer,
             alert_event=self.alert_event,
             verdict='real',
@@ -96,7 +97,7 @@ class OperatorJudgmentModelTest(TestCase):
 
     def test_unique_together_constraint(self):
         """Test that one operator can only judge an alert once."""
-        OperatorJudgment.objects.create(
+        OperatorJudgment.all_objects.create(
             customer=self.customer,
             alert_event=self.alert_event,
             verdict='noise',
@@ -106,7 +107,7 @@ class OperatorJudgmentModelTest(TestCase):
         # Attempting to create another judgment for same alert + operator should fail
         # (update_or_create pattern should be used in practice)
         with self.assertRaises(Exception):
-            OperatorJudgment.objects.create(
+            OperatorJudgment.all_objects.create(
                 customer=self.customer,
                 alert_event=self.alert_event,
                 verdict='real',
@@ -142,13 +143,13 @@ class OperatorFeedbackAPITest(TestCase):
         )
 
         # Create test data
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             run_type='weekly',
             status='success'
         )
 
-        self.drift_event = DriftEvent.objects.create(
+        self.drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer="Test Payer",
@@ -165,7 +166,7 @@ class OperatorFeedbackAPITest(TestCase):
             current_end=timezone.now().date()
         )
 
-        self.alert_rule = AlertRule.objects.create(
+        self.alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name="High Severity Alert",
             metric="severity",
@@ -173,7 +174,7 @@ class OperatorFeedbackAPITest(TestCase):
             severity="critical"
         )
 
-        self.alert_event = AlertEvent.objects.create(
+        self.alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -199,14 +200,15 @@ class OperatorFeedbackAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # Verify judgment was created
-        judgment = OperatorJudgment.objects.get(alert_event=self.alert_event)
-        self.assertEqual(judgment.verdict, 'noise')
-        self.assertEqual(judgment.operator, self.user)
-        self.assertEqual(judgment.reason_codes_json, ['false_positive', 'data_entry_error'])
+        with customer_context(self.customer):
+            judgment = OperatorJudgment.objects.get(alert_event=self.alert_event)
+            self.assertEqual(judgment.verdict, 'noise')
+            self.assertEqual(judgment.operator, self.user)
+            self.assertEqual(judgment.reason_codes_json, ['false_positive', 'data_entry_error'])
 
-        # Verify alert status was updated
-        self.alert_event.refresh_from_db()
-        self.assertEqual(self.alert_event.status, 'resolved')
+            # Verify alert status was updated
+            self.alert_event.refresh_from_db()
+            self.assertEqual(self.alert_event.status, 'resolved')
 
     def test_submit_real_verdict_with_recovery(self):
         """Test submitting a 'real' verdict with recovery amount."""
@@ -223,13 +225,14 @@ class OperatorFeedbackAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # Verify judgment
-        judgment = OperatorJudgment.objects.get(alert_event=self.alert_event)
-        self.assertEqual(judgment.verdict, 'real')
-        self.assertEqual(judgment.recovered_amount, Decimal('25000.50'))
+        with customer_context(self.customer):
+            judgment = OperatorJudgment.objects.get(alert_event=self.alert_event)
+            self.assertEqual(judgment.verdict, 'real')
+            self.assertEqual(judgment.recovered_amount, Decimal('25000.50'))
 
-        # Verify alert status
-        self.alert_event.refresh_from_db()
-        self.assertEqual(self.alert_event.status, 'acknowledged')
+            # Verify alert status
+            self.alert_event.refresh_from_db()
+            self.assertEqual(self.alert_event.status, 'acknowledged')
 
     def test_submit_needs_followup_verdict(self):
         """Test submitting a 'needs_followup' verdict."""
@@ -243,12 +246,13 @@ class OperatorFeedbackAPITest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        judgment = OperatorJudgment.objects.get(alert_event=self.alert_event)
-        self.assertEqual(judgment.verdict, 'needs_followup')
+        with customer_context(self.customer):
+            judgment = OperatorJudgment.objects.get(alert_event=self.alert_event)
+            self.assertEqual(judgment.verdict, 'needs_followup')
 
-        # Verify alert status remains pending
-        self.alert_event.refresh_from_db()
-        self.assertEqual(self.alert_event.status, 'pending')
+            # Verify alert status remains pending
+            self.alert_event.refresh_from_db()
+            self.assertEqual(self.alert_event.status, 'pending')
 
     def test_update_existing_judgment(self):
         """Test that submitting feedback twice updates the existing judgment."""
@@ -265,19 +269,21 @@ class OperatorFeedbackAPITest(TestCase):
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
 
         # Verify only one judgment exists
-        judgments = OperatorJudgment.objects.filter(alert_event=self.alert_event)
-        self.assertEqual(judgments.count(), 1)
-        self.assertEqual(judgments.first().verdict, 'real')
+        with customer_context(self.customer):
+            judgments = OperatorJudgment.objects.filter(alert_event=self.alert_event)
+            self.assertEqual(judgments.count(), 1)
+            self.assertEqual(judgments.first().verdict, 'real')
 
     def test_list_alert_events_with_judgments(self):
         """Test that alert events API includes judgment information."""
-        # Create a judgment
-        OperatorJudgment.objects.create(
-            customer=self.customer,
-            alert_event=self.alert_event,
-            verdict='noise',
-            operator=self.user
-        )
+        # Create a judgment within customer context
+        with customer_context(self.customer):
+            OperatorJudgment.objects.create(
+                customer=self.customer,
+                alert_event=self.alert_event,
+                verdict='noise',
+                operator=self.user
+            )
 
         # Fetch alert event
         url = f'/api/v1/alerts/{self.alert_event.id}/'

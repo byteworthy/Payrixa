@@ -234,7 +234,7 @@ class OperatorJudgmentSerializer(serializers.ModelSerializer):
 class AlertEventSerializer(serializers.ModelSerializer):
     """Serializer for AlertEvent model with operator judgments."""
 
-    operator_judgments = OperatorJudgmentSerializer(many=True, read_only=True)
+    operator_judgments = serializers.SerializerMethodField()
     has_judgment = serializers.SerializerMethodField()
     latest_judgment_verdict = serializers.SerializerMethodField()
 
@@ -248,15 +248,36 @@ class AlertEventSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'triggered_at']
 
+    def get_operator_judgments(self, obj):
+        """Get operator judgments for this alert event."""
+        # Use for_customer to explicitly query judgments for this customer
+        from upstream.core.tenant import get_current_customer
+        customer = get_current_customer()
+        if customer:
+            judgments = OperatorJudgment.objects.for_customer(customer).filter(alert_event=obj)
+        else:
+            judgments = OperatorJudgment.all_objects.filter(alert_event=obj, customer=obj.customer)
+        return OperatorJudgmentSerializer(judgments, many=True).data
+
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_judgment(self, obj):
         """Check if this alert has any operator judgment."""
-        return obj.operator_judgments.exists()
+        from upstream.core.tenant import get_current_customer
+        customer = get_current_customer()
+        if customer:
+            return OperatorJudgment.objects.for_customer(customer).filter(alert_event=obj).exists()
+        else:
+            return OperatorJudgment.all_objects.filter(alert_event=obj, customer=obj.customer).exists()
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_latest_judgment_verdict(self, obj):
         """Get the most recent operator judgment verdict."""
-        latest = obj.operator_judgments.order_by('-created_at').first()
+        from upstream.core.tenant import get_current_customer
+        customer = get_current_customer()
+        if customer:
+            latest = OperatorJudgment.objects.for_customer(customer).filter(alert_event=obj).order_by('-created_at').first()
+        else:
+            latest = OperatorJudgment.all_objects.filter(alert_event=obj, customer=obj.customer).order_by('-created_at').first()
         return latest.verdict if latest else None
 
 
