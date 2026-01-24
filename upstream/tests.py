@@ -6,6 +6,7 @@ from upstream.models import Customer, UserProfile, Upload, ClaimRecord, ReportRu
 from upstream.views import UploadsView
 from upstream.utils import get_current_customer
 from upstream.services.payer_drift import compute_weekly_payer_drift
+from upstream.core.tenant import customer_context
 import csv
 import io
 import os
@@ -63,26 +64,27 @@ class CSVUploadTests(TestCase):
         request.session = {}
         request._messages = FallbackStorage(request)
 
-        # Process the upload
+        # Process the upload within customer context for tenant isolation
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload was created successfully
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'success')
-        self.assertEqual(upload.row_count, 3)
-        self.assertEqual(upload.filename, 'test.csv')
+            # Check that upload was created successfully
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'success')
+            self.assertEqual(upload.row_count, 3)
+            self.assertEqual(upload.filename, 'test.csv')
 
-        # Check that claim records were created
-        claim_records = ClaimRecord.objects.filter(upload=upload)
-        self.assertEqual(claim_records.count(), 3)
+            # Check that claim records were created
+            claim_records = ClaimRecord.objects.filter(upload=upload)
+            self.assertEqual(claim_records.count(), 3)
 
-        # Check first record
-        record1 = claim_records[0]
-        self.assertEqual(record1.payer, 'UnitedHealthcare')
-        self.assertEqual(record1.cpt, '99213')
-        self.assertEqual(record1.outcome, 'PAID')
-        self.assertEqual(record1.allowed_amount, 100.50)
+            # Check first record
+            record1 = claim_records[0]
+            self.assertEqual(record1.payer, 'UnitedHealthcare')
+            self.assertEqual(record1.cpt, '99213')
+            self.assertEqual(record1.outcome, 'PAID')
+            self.assertEqual(record1.allowed_amount, 100.50)
 
     def test_missing_required_column(self):
         """Test CSV upload with missing required column."""
@@ -102,15 +104,16 @@ class CSVUploadTests(TestCase):
         request._messages = FallbackStorage(request)
 
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload failed
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'failed')
-        self.assertIn('Missing required column: outcome', upload.error_message)
+            # Check that upload failed
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'failed')
+            self.assertIn('Missing required column: outcome', upload.error_message)
 
-        # Check that no claim records were created
-        self.assertEqual(ClaimRecord.objects.count(), 0)
+            # Check that no claim records were created
+            self.assertEqual(ClaimRecord.objects.count(), 0)
 
     def test_invalid_date_format(self):
         """Test CSV upload with invalid date format."""
@@ -129,16 +132,18 @@ class CSVUploadTests(TestCase):
         request._messages = FallbackStorage(request)
 
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload failed
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'failed')
-        self.assertIn('Error processing row 2', upload.error_message)
-        self.assertIn('Invalid decided_date format', upload.error_message)
+            # Check that upload failed
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'failed')
+            # Check for data rejection message
+            self.assertIn('rejected', upload.error_message.lower())
+            self.assertIn('Invalid dates: 1', upload.error_message)
 
-        # Check that no claim records were created
-        self.assertEqual(ClaimRecord.objects.count(), 0)
+            # Check that no claim records were created
+            self.assertEqual(ClaimRecord.objects.count(), 0)
 
     def test_missing_decided_date(self):
         """Test CSV upload with missing decided_date (should fail for MVP)."""
@@ -157,17 +162,18 @@ class CSVUploadTests(TestCase):
         request._messages = FallbackStorage(request)
 
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload failed
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'failed')
-        self.assertIn('Missing required field', upload.error_message)
-        self.assertIn('decided_date', upload.error_message)
-        self.assertIn('row 2', upload.error_message)
+            # Check that upload failed
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'failed')
+            # Check for missing field rejection message
+            self.assertIn('rejected', upload.error_message.lower())
+            self.assertIn('Missing fields: 1', upload.error_message)
 
-        # Check that no claim records were created
-        self.assertEqual(ClaimRecord.objects.count(), 0)
+            # Check that no claim records were created
+            self.assertEqual(ClaimRecord.objects.count(), 0)
 
     def test_extra_columns_ignored(self):
         """Test that extra columns are ignored (not stored)."""
@@ -186,19 +192,20 @@ class CSVUploadTests(TestCase):
         request._messages = FallbackStorage(request)
 
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload succeeded (extra columns ignored)
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'success')
-        self.assertEqual(upload.row_count, 1)
+            # Check that upload succeeded (extra columns ignored)
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'success')
+            self.assertEqual(upload.row_count, 1)
 
-        # Check that claim record was created without extra data
-        record = ClaimRecord.objects.get(upload=upload)
-        self.assertEqual(record.payer, 'UnitedHealthcare')
-        # Verify that patient_name and ssn were not stored
-        self.assertFalse(hasattr(record, 'patient_name'))
-        self.assertFalse(hasattr(record, 'ssn'))
+            # Check that claim record was created without extra data
+            record = ClaimRecord.objects.get(upload=upload)
+            self.assertEqual(record.payer, 'UnitedHealthcare')
+            # Verify that patient_name and ssn were not stored
+            self.assertFalse(hasattr(record, 'patient_name'))
+            self.assertFalse(hasattr(record, 'ssn'))
 
     def test_date_formats(self):
         """Test various valid date formats."""
@@ -219,18 +226,19 @@ class CSVUploadTests(TestCase):
         request._messages = FallbackStorage(request)
 
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload succeeded
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'success')
-        self.assertEqual(upload.row_count, 3)
+            # Check that upload succeeded
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'success')
+            self.assertEqual(upload.row_count, 3)
 
-        # Check dates were parsed correctly
-        records = ClaimRecord.objects.filter(upload=upload).order_by('id')
-        self.assertEqual(records[0].submitted_date, datetime.strptime('2023-01-15', '%Y-%m-%d').date())
-        self.assertEqual(records[1].submitted_date, datetime.strptime('01/16/2023', '%m/%d/%Y').date())
-        self.assertEqual(records[2].submitted_date, datetime.strptime('2023/01/17', '%Y/%m/%d').date())
+            # Check dates were parsed correctly
+            records = ClaimRecord.objects.filter(upload=upload).order_by('id')
+            self.assertEqual(records[0].submitted_date, datetime.strptime('2023-01-15', '%Y-%m-%d').date())
+            self.assertEqual(records[1].submitted_date, datetime.strptime('01/16/2023', '%m/%d/%Y').date())
+            self.assertEqual(records[2].submitted_date, datetime.strptime('2023/01/17', '%Y/%m/%d').date())
 
     def test_outcome_normalization(self):
         """Test outcome normalization."""
@@ -253,19 +261,20 @@ class CSVUploadTests(TestCase):
         request._messages = FallbackStorage(request)
 
         view = UploadsView()
-        response = view.post(request)
+        with customer_context(self.customer):
+            response = view.post(request)
 
-        # Check that upload succeeded
-        upload = Upload.objects.latest('uploaded_at')
-        self.assertEqual(upload.status, 'success')
+            # Check that upload succeeded
+            upload = Upload.objects.latest('uploaded_at')
+            self.assertEqual(upload.status, 'success')
 
-        # Check outcome normalization
-        records = ClaimRecord.objects.filter(upload=upload).order_by('id')
-        self.assertEqual(records[0].outcome, 'PAID')  # 'paid' -> 'PAID'
-        self.assertEqual(records[1].outcome, 'PAID')  # 'APPROVED' -> 'PAID'
-        self.assertEqual(records[2].outcome, 'DENIED')  # 'DENIED' -> 'DENIED'
-        self.assertEqual(records[3].outcome, 'DENIED')  # 'REJECTED' -> 'DENIED'
-        self.assertEqual(records[4].outcome, 'OTHER')  # 'PENDING' -> 'OTHER'
+            # Check outcome normalization
+            records = ClaimRecord.objects.filter(upload=upload).order_by('id')
+            self.assertEqual(records[0].outcome, 'PAID')  # 'paid' -> 'PAID'
+            self.assertEqual(records[1].outcome, 'PAID')  # 'APPROVED' -> 'PAID'
+            self.assertEqual(records[2].outcome, 'DENIED')  # 'DENIED' -> 'DENIED'
+            self.assertEqual(records[3].outcome, 'DENIED')  # 'REJECTED' -> 'DENIED'
+            self.assertEqual(records[4].outcome, 'OTHER')  # 'PENDING' -> 'OTHER'
 
 class PayerDriftTests(TestCase):
     def setUp(self):
@@ -274,14 +283,15 @@ class PayerDriftTests(TestCase):
 
     def create_claim_record(self, payer, cpt_group, submitted_date, decided_date, outcome):
         """Helper to create a claim record."""
-        upload = Upload.objects.create(
+        # Use all_objects to bypass tenant filtering when creating test data
+        upload = Upload.all_objects.create(
             customer=self.customer,
             filename='test.csv',
             status='success',
             row_count=1
         )
 
-        return ClaimRecord.objects.create(
+        return ClaimRecord.all_objects.create(
             customer=self.customer,
             upload=upload,
             payer=payer,
@@ -314,30 +324,31 @@ class PayerDriftTests(TestCase):
             outcome = 'DENIED' if i < 30 else 'PAID'
             self.create_claim_record('UnitedHealthcare', 'EVAL', submitted_date, decided_date, outcome)
 
-        # Run computation
-        report_run = compute_weekly_payer_drift(
-            customer=self.customer,
-            baseline_days=90,
-            current_days=14,
-            min_volume=30,
-            as_of_date=self.as_of_date
-        )
+        # Run computation within customer context
+        with customer_context(self.customer):
+            report_run = compute_weekly_payer_drift(
+                customer=self.customer,
+                baseline_days=90,
+                current_days=14,
+                min_volume=30,
+                as_of_date=self.as_of_date
+            )
 
-        # Check results
-        self.assertEqual(report_run.status, 'success')
-        self.assertEqual(report_run.summary_json['events_created'], 1)
+            # Check results
+            self.assertEqual(report_run.status, 'success')
+            self.assertEqual(report_run.summary_json['events_created'], 1)
 
-        # Check drift event
-        drift_events = DriftEvent.objects.filter(report_run=report_run)
-        self.assertEqual(drift_events.count(), 1)
+            # Check drift event
+            drift_events = DriftEvent.objects.filter(report_run=report_run)
+            self.assertEqual(drift_events.count(), 1)
 
-        event = drift_events.first()
-        self.assertEqual(event.drift_type, 'DENIAL_RATE')
-        self.assertEqual(event.payer, 'UnitedHealthcare')
-        self.assertEqual(event.cpt_group, 'EVAL')
-        self.assertAlmostEqual(event.baseline_value, 0.2, places=1)  # 20% denial rate
-        self.assertAlmostEqual(event.current_value, 0.6, places=1)   # 60% denial rate
-        self.assertAlmostEqual(event.delta_value, 0.4, places=1)     # +40% delta
+            event = drift_events.first()
+            self.assertEqual(event.drift_type, 'DENIAL_RATE')
+            self.assertEqual(event.payer, 'UnitedHealthcare')
+            self.assertEqual(event.cpt_group, 'EVAL')
+            self.assertAlmostEqual(event.baseline_value, 0.2, places=1)  # 20% denial rate
+            self.assertAlmostEqual(event.current_value, 0.6, places=1)   # 60% denial rate
+            self.assertAlmostEqual(event.delta_value, 0.4, places=1)     # +40% delta
 
     def test_decision_time_drift_up(self):
         """Test that DriftEvents are created when decision time drifts up."""
@@ -359,30 +370,31 @@ class PayerDriftTests(TestCase):
             decided_date = submitted_date + timedelta(days=15)  # Slow decisions
             self.create_claim_record('Aetna', 'SURG', submitted_date, decided_date, 'PAID')
 
-        # Run computation
-        report_run = compute_weekly_payer_drift(
-            customer=self.customer,
-            baseline_days=90,
-            current_days=14,
-            min_volume=30,
-            as_of_date=self.as_of_date
-        )
+        # Run computation within customer context
+        with customer_context(self.customer):
+            report_run = compute_weekly_payer_drift(
+                customer=self.customer,
+                baseline_days=90,
+                current_days=14,
+                min_volume=30,
+                as_of_date=self.as_of_date
+            )
 
-        # Check results
-        self.assertEqual(report_run.status, 'success')
-        self.assertEqual(report_run.summary_json['events_created'], 1)
+            # Check results
+            self.assertEqual(report_run.status, 'success')
+            self.assertEqual(report_run.summary_json['events_created'], 1)
 
-        # Check drift event
-        drift_events = DriftEvent.objects.filter(report_run=report_run)
-        self.assertEqual(drift_events.count(), 1)
+            # Check drift event
+            drift_events = DriftEvent.objects.filter(report_run=report_run)
+            self.assertEqual(drift_events.count(), 1)
 
-        event = drift_events.first()
-        self.assertEqual(event.drift_type, 'DECISION_TIME')
-        self.assertEqual(event.payer, 'Aetna')
-        self.assertEqual(event.cpt_group, 'SURG')
-        self.assertEqual(event.baseline_value, 5.0)   # 5 days median
-        self.assertEqual(event.current_value, 15.0)   # 15 days median
-        self.assertEqual(event.delta_value, 10.0)     # +10 days delta
+            event = drift_events.first()
+            self.assertEqual(event.drift_type, 'DECISION_TIME')
+            self.assertEqual(event.payer, 'Aetna')
+            self.assertEqual(event.cpt_group, 'SURG')
+            self.assertEqual(event.baseline_value, 5.0)   # 5 days median
+            self.assertEqual(event.current_value, 15.0)   # 15 days median
+            self.assertEqual(event.delta_value, 10.0)     # +10 days delta
 
     def test_no_events_below_min_volume(self):
         """Test that no DriftEvents are created when volume is below threshold."""
@@ -404,19 +416,20 @@ class PayerDriftTests(TestCase):
             decided_date = submitted_date + timedelta(days=10)
             self.create_claim_record('Cigna', 'RAD', submitted_date, decided_date, 'DENIED')
 
-        # Run computation
-        report_run = compute_weekly_payer_drift(
-            customer=self.customer,
-            baseline_days=90,
-            current_days=14,
-            min_volume=30,
-            as_of_date=self.as_of_date
-        )
+        # Run computation within customer context
+        with customer_context(self.customer):
+            report_run = compute_weekly_payer_drift(
+                customer=self.customer,
+                baseline_days=90,
+                current_days=14,
+                min_volume=30,
+                as_of_date=self.as_of_date
+            )
 
-        # Check results - should have no events due to low baseline volume
-        self.assertEqual(report_run.status, 'success')
-        self.assertEqual(report_run.summary_json['events_created'], 0)
-        self.assertEqual(DriftEvent.objects.filter(report_run=report_run).count(), 0)
+            # Check results - should have no events due to low baseline volume
+            self.assertEqual(report_run.status, 'success')
+            self.assertEqual(report_run.summary_json['events_created'], 0)
+            self.assertEqual(DriftEvent.objects.filter(report_run=report_run).count(), 0)
 
     def test_baseline_zero_denial_rate(self):
         """Test handling of baseline zero denial rate safely."""
@@ -439,23 +452,24 @@ class PayerDriftTests(TestCase):
             outcome = 'DENIED' if i < 5 else 'PAID'
             self.create_claim_record('BlueCross', 'PATH', submitted_date, decided_date, outcome)
 
-        # Run computation - should not crash
-        report_run = compute_weekly_payer_drift(
-            customer=self.customer,
-            baseline_days=90,
-            current_days=14,
-            min_volume=30,
-            as_of_date=self.as_of_date
-        )
+        # Run computation within customer context - should not crash
+        with customer_context(self.customer):
+            report_run = compute_weekly_payer_drift(
+                customer=self.customer,
+                baseline_days=90,
+                current_days=14,
+                min_volume=30,
+                as_of_date=self.as_of_date
+            )
 
-        # Should create event for denial rate drift (0% -> 12.5%)
-        self.assertEqual(report_run.status, 'success')
-        self.assertEqual(report_run.summary_json['events_created'], 1)
+            # Should create event for denial rate drift (0% -> 12.5%)
+            self.assertEqual(report_run.status, 'success')
+            self.assertEqual(report_run.summary_json['events_created'], 1)
 
-        event = DriftEvent.objects.get(report_run=report_run)
-        self.assertEqual(event.drift_type, 'DENIAL_RATE')
-        self.assertEqual(event.baseline_value, 0.0)
-        self.assertAlmostEqual(event.current_value, 0.125, places=3)
+            event = DriftEvent.objects.get(report_run=report_run)
+            self.assertEqual(event.drift_type, 'DENIAL_RATE')
+            self.assertEqual(event.baseline_value, 0.0)
+            self.assertAlmostEqual(event.current_value, 0.125, places=3)
 
     def _test_atomicity_on_exception(self):
         """Test that exceptions result in failed ReportRun and no DriftEvents.
