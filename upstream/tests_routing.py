@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
+from upstream.core.tenant import customer_context
 from upstream.models import Customer, DriftEvent, ReportRun
 from upstream.alerts.models import AlertRule, NotificationChannel, AlertEvent
 from upstream.alerts.services import send_slack_notification, send_alert_notification
@@ -19,18 +20,18 @@ class SlackNotificationTest(TestCase):
         """Set up test data."""
         self.user = User.objects.create_user(username='testuser', password='testpass123')
         self.customer = Customer.objects.create(name='Test Hospital')
-        
+
         # Create Slack notification channel
-        self.slack_channel = NotificationChannel.objects.create(
+        self.slack_channel = NotificationChannel.all_objects.create(
             customer=self.customer,
             name='Slack Alerts',
             channel_type='slack',
             config={'webhook_url': 'https://hooks.slack.com/services/TEST/WEBHOOK'},
             enabled=True
         )
-        
+
         # Create alert rule
-        self.alert_rule = AlertRule.objects.create(
+        self.alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name='High Severity Drift',
             metric='severity',
@@ -39,14 +40,14 @@ class SlackNotificationTest(TestCase):
             severity='critical',
             enabled=True
         )
-        
+
         # Create report run and drift event
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             status='completed'
         )
-        
-        self.drift_event = DriftEvent.objects.create(
+
+        self.drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer='Medicare',
@@ -62,9 +63,9 @@ class SlackNotificationTest(TestCase):
             current_start=timezone.now().date() - timedelta(days=14),
             current_end=timezone.now().date()
         )
-        
+
         # Create alert event
-        self.alert_event = AlertEvent.objects.create(
+        self.alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             drift_event=self.drift_event,
@@ -137,26 +138,26 @@ class AdvancedRoutingTest(TestCase):
         """Set up test data."""
         self.user = User.objects.create_user(username='testuser', password='testpass123')
         self.customer = Customer.objects.create(name='Test Hospital')
-        
+
         # Create multiple notification channels
-        self.email_channel = NotificationChannel.objects.create(
+        self.email_channel = NotificationChannel.all_objects.create(
             customer=self.customer,
             name='Email Alerts',
             channel_type='email',
             config={'recipients': ['alerts@test.com']},
             enabled=True
         )
-        
-        self.slack_channel = NotificationChannel.objects.create(
+
+        self.slack_channel = NotificationChannel.all_objects.create(
             customer=self.customer,
             name='Slack Alerts',
             channel_type='slack',
             config={'webhook_url': 'https://hooks.slack.com/test'},
             enabled=True
         )
-        
+
         # Create report run
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             status='completed'
         )
@@ -172,7 +173,7 @@ class AdvancedRoutingTest(TestCase):
         mock_slack.return_value = mock_slack_response
         
         # Create alert rule with specific channel routing
-        alert_rule = AlertRule.objects.create(
+        alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name='Slack Only Rule',
             metric='severity',
@@ -181,8 +182,8 @@ class AdvancedRoutingTest(TestCase):
             enabled=True
         )
         alert_rule.routing_channels.add(self.slack_channel)
-        
-        drift_event = DriftEvent.objects.create(
+
+        drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer='Aetna',
@@ -198,8 +199,8 @@ class AdvancedRoutingTest(TestCase):
             current_start=timezone.now().date() - timedelta(days=14),
             current_end=timezone.now().date()
         )
-        
-        alert_event = AlertEvent.objects.create(
+
+        alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=alert_rule,
             drift_event=drift_event,
@@ -212,55 +213,57 @@ class AdvancedRoutingTest(TestCase):
                 'severity': 0.75
             }
         )
-        
-        result = send_alert_notification(alert_event)
-        
-        self.assertTrue(result)
-        # Email should NOT be called (only Slack)
-        mock_email.assert_not_called()
-        # Slack should be called
-        self.assertEqual(mock_slack.call_count, 1)
+
+        with customer_context(self.customer):
+            result = send_alert_notification(alert_event)
+
+            self.assertTrue(result)
+            # Email should NOT be called (only Slack)
+            mock_email.assert_not_called()
+            # Slack should be called
+            self.assertEqual(mock_slack.call_count, 1)
     
     def test_routing_priority(self):
         """Test alert rule priority ordering."""
         # Create rules with different priorities
-        rule_low = AlertRule.objects.create(
+        rule_low = AlertRule.all_objects.create(
             customer=self.customer,
             name='Low Priority',
             routing_priority=0,
             enabled=True
         )
-        
-        rule_medium = AlertRule.objects.create(
+
+        rule_medium = AlertRule.all_objects.create(
             customer=self.customer,
             name='Medium Priority',
             routing_priority=5,
             enabled=True
         )
-        
-        rule_high = AlertRule.objects.create(
+
+        rule_high = AlertRule.all_objects.create(
             customer=self.customer,
             name='High Priority',
             routing_priority=10,
             enabled=True
         )
-        
+
         # Query rules ordered by priority
-        rules = AlertRule.objects.filter(customer=self.customer).order_by('-routing_priority')
-        
-        self.assertEqual(rules[0].name, 'High Priority')
-        self.assertEqual(rules[1].name, 'Medium Priority')
-        self.assertEqual(rules[2].name, 'Low Priority')
+        with customer_context(self.customer):
+            rules = AlertRule.objects.filter(customer=self.customer).order_by('-routing_priority')
+
+            self.assertEqual(rules[0].name, 'High Priority')
+            self.assertEqual(rules[1].name, 'Medium Priority')
+            self.assertEqual(rules[2].name, 'Low Priority')
     
     def test_routing_tags(self):
         """Test routing tags for categorization."""
-        alert_rule = AlertRule.objects.create(
+        alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name='Tagged Rule',
             routing_tags=['critical', 'medicare', 'denial'],
             enabled=True
         )
-        
+
         self.assertEqual(len(alert_rule.routing_tags), 3)
         self.assertIn('critical', alert_rule.routing_tags)
         self.assertIn('medicare', alert_rule.routing_tags)
@@ -268,8 +271,8 @@ class AdvancedRoutingTest(TestCase):
     def test_duplicate_alert_prevention(self):
         """Test that duplicate alerts are not created for same drift event and rule."""
         from upstream.alerts.services import evaluate_drift_event
-        
-        alert_rule = AlertRule.objects.create(
+
+        alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name='Test Rule',
             metric='severity',
@@ -277,8 +280,8 @@ class AdvancedRoutingTest(TestCase):
             threshold_value=0.5,
             enabled=True
         )
-        
-        drift_event = DriftEvent.objects.create(
+
+        drift_event = DriftEvent.all_objects.create(
             customer=self.customer,
             report_run=self.report_run,
             payer='UHC',
@@ -294,19 +297,20 @@ class AdvancedRoutingTest(TestCase):
             current_start=timezone.now().date() - timedelta(days=14),
             current_end=timezone.now().date()
         )
-        
-        # First evaluation creates alert
-        alert_events_1 = evaluate_drift_event(drift_event)
-        self.assertEqual(len(alert_events_1), 1)
-        
-        # Second evaluation should NOT create duplicate
-        alert_events_2 = evaluate_drift_event(drift_event)
-        self.assertEqual(len(alert_events_2), 1)
-        self.assertEqual(alert_events_1[0].id, alert_events_2[0].id)
-        
-        # Verify only one alert event exists
-        total_alerts = AlertEvent.objects.filter(
-            drift_event=drift_event,
-            alert_rule=alert_rule
-        ).count()
-        self.assertEqual(total_alerts, 1)
+
+        with customer_context(self.customer):
+            # First evaluation creates alert
+            alert_events_1 = evaluate_drift_event(drift_event)
+            self.assertEqual(len(alert_events_1), 1)
+
+            # Second evaluation should NOT create duplicate
+            alert_events_2 = evaluate_drift_event(drift_event)
+            self.assertEqual(len(alert_events_2), 1)
+            self.assertEqual(alert_events_1[0].id, alert_events_2[0].id)
+
+            # Verify only one alert event exists
+            total_alerts = AlertEvent.objects.filter(
+                drift_event=drift_event,
+                alert_rule=alert_rule
+            ).count()
+            self.assertEqual(total_alerts, 1)

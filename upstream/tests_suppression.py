@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
 
+from upstream.core.tenant import customer_context
 from upstream.models import Customer, DriftEvent, ReportRun
 from upstream.alerts.models import AlertRule, AlertEvent, OperatorJudgment
 from upstream.alerts.services import _is_suppressed
@@ -21,13 +22,13 @@ class AlertSuppressionTest(TestCase):
         self.customer = Customer.objects.create(name="Test Hospital")
         self.operator = User.objects.create_user(username="operator1", password="testpass")
 
-        self.report_run = ReportRun.objects.create(
+        self.report_run = ReportRun.all_objects.create(
             customer=self.customer,
             run_type='weekly',
             status='success'
         )
 
-        self.alert_rule = AlertRule.objects.create(
+        self.alert_rule = AlertRule.all_objects.create(
             customer=self.customer,
             name="High Denial Rate",
             metric='severity',
@@ -42,8 +43,9 @@ class AlertSuppressionTest(TestCase):
             'entity_label': 'BCBS',
         }
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertFalse(result)
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertFalse(result)
 
     def test_time_based_suppression(self):
         """Alerts should be suppressed within 4-hour cooldown window."""
@@ -54,7 +56,7 @@ class AlertSuppressionTest(TestCase):
         }
 
         # Create a recent alert that was sent
-        AlertEvent.objects.create(
+        AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             status='sent',
@@ -62,8 +64,9 @@ class AlertSuppressionTest(TestCase):
             payload=evidence_payload
         )
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertTrue(result, "Alert should be suppressed within 4-hour window")
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertTrue(result, "Alert should be suppressed within 4-hour window")
 
     def test_time_based_suppression_expired(self):
         """Alerts should NOT be suppressed after 4-hour cooldown expires."""
@@ -74,7 +77,7 @@ class AlertSuppressionTest(TestCase):
         }
 
         # Create an old alert that was sent 5 hours ago
-        AlertEvent.objects.create(
+        AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             status='sent',
@@ -82,8 +85,9 @@ class AlertSuppressionTest(TestCase):
             payload=evidence_payload
         )
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertFalse(result, "Alert should NOT be suppressed after cooldown expires")
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertFalse(result, "Alert should NOT be suppressed after cooldown expires")
 
     def test_noise_judgment_suppression_single(self):
         """Single noise judgment should not suppress (need 2+)."""
@@ -94,7 +98,7 @@ class AlertSuppressionTest(TestCase):
         }
 
         # Create an alert from 10 days ago
-        alert_event = AlertEvent.objects.create(
+        alert_event = AlertEvent.all_objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
             status='sent',
@@ -104,7 +108,7 @@ class AlertSuppressionTest(TestCase):
         )
 
         # Mark it as noise
-        OperatorJudgment.objects.create(
+        OperatorJudgment.all_objects.create(
             customer=self.customer,
             alert_event=alert_event,
             operator=self.operator,
@@ -112,8 +116,9 @@ class AlertSuppressionTest(TestCase):
             notes='False positive'
         )
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertFalse(result, "Single noise judgment should not suppress")
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertFalse(result, "Single noise judgment should not suppress")
 
     def test_noise_judgment_suppression_multiple(self):
         """Multiple noise judgments should suppress similar alerts."""
@@ -125,7 +130,7 @@ class AlertSuppressionTest(TestCase):
 
         # Create two alerts from different days, both marked as noise
         for days_ago in [10, 20]:
-            alert_event = AlertEvent.objects.create(
+            alert_event = AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 status='sent',
@@ -134,7 +139,7 @@ class AlertSuppressionTest(TestCase):
                 payload=evidence_payload
             )
 
-            OperatorJudgment.objects.create(
+            OperatorJudgment.all_objects.create(
                 customer=self.customer,
                 alert_event=alert_event,
                 operator=self.operator,
@@ -142,8 +147,9 @@ class AlertSuppressionTest(TestCase):
                 notes=f'False positive {days_ago} days ago'
             )
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertTrue(result, "2+ noise judgments should suppress similar alerts")
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertTrue(result, "2+ noise judgments should suppress similar alerts")
 
     def test_noise_judgment_expired(self):
         """Noise judgments older than 30 days should not suppress."""
@@ -155,7 +161,7 @@ class AlertSuppressionTest(TestCase):
 
         # Create two alerts from 35 days ago, both marked as noise
         for days_ago in [35, 40]:
-            alert_event = AlertEvent.objects.create(
+            alert_event = AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 status='sent',
@@ -174,12 +180,13 @@ class AlertSuppressionTest(TestCase):
             )
             judgment.save()
             # Manually update created_at after save to bypass auto_now_add
-            OperatorJudgment.objects.filter(id=judgment.id).update(
+            OperatorJudgment.all_objects.filter(id=judgment.id).update(
                 created_at=timezone.now() - timedelta(days=days_ago)
             )
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertFalse(result, "Old noise judgments (30+ days) should not suppress")
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertFalse(result, "Old noise judgments (30+ days) should not suppress")
 
     def test_real_judgment_does_not_suppress(self):
         """Alerts marked as 'real' should not suppress future alerts."""
@@ -191,7 +198,7 @@ class AlertSuppressionTest(TestCase):
 
         # Create two alerts marked as "real"
         for days_ago in [10, 20]:
-            alert_event = AlertEvent.objects.create(
+            alert_event = AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 status='sent',
@@ -200,7 +207,7 @@ class AlertSuppressionTest(TestCase):
                 payload=evidence_payload
             )
 
-            OperatorJudgment.objects.create(
+            OperatorJudgment.all_objects.create(
                 customer=self.customer,
                 alert_event=alert_event,
                 operator=self.operator,
@@ -208,8 +215,9 @@ class AlertSuppressionTest(TestCase):
                 notes='Legitimate issue'
             )
 
-        result = _is_suppressed(self.customer, evidence_payload)
-        self.assertFalse(result, "Alerts marked as 'real' should not suppress future alerts")
+        with customer_context(self.customer):
+            result = _is_suppressed(self.customer, evidence_payload)
+            self.assertFalse(result, "Alerts marked as 'real' should not suppress future alerts")
 
     def test_different_payer_not_suppressed(self):
         """Noise judgments for one payer should not suppress another payer."""
@@ -221,7 +229,7 @@ class AlertSuppressionTest(TestCase):
         }
 
         for days_ago in [10, 20]:
-            alert_event = AlertEvent.objects.create(
+            alert_event = AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 status='sent',
@@ -230,7 +238,7 @@ class AlertSuppressionTest(TestCase):
                 payload=bcbs_payload
             )
 
-            OperatorJudgment.objects.create(
+            OperatorJudgment.all_objects.create(
                 customer=self.customer,
                 alert_event=alert_event,
                 operator=self.operator,
@@ -259,7 +267,7 @@ class AlertSuppressionTest(TestCase):
 
         # Create noise judgments for customer1
         for days_ago in [10, 20]:
-            alert_event = AlertEvent.objects.create(
+            alert_event = AlertEvent.all_objects.create(
                 customer=self.customer,
                 alert_rule=self.alert_rule,
                 status='sent',
@@ -268,7 +276,7 @@ class AlertSuppressionTest(TestCase):
                 payload=evidence_payload
             )
 
-            OperatorJudgment.objects.create(
+            OperatorJudgment.all_objects.create(
                 customer=self.customer,
                 alert_event=alert_event,
                 operator=self.operator,
