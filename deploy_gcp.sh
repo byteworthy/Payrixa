@@ -190,8 +190,7 @@ deploy_application() {
 
     # Build and deploy using Cloud Build
     gcloud builds submit \
-        --config cloudbuild.yaml \
-        --substitutions=_REGION="$REGION"
+        --config cloudbuild.yaml
 
     # Get service URL
     SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
