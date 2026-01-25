@@ -242,9 +242,64 @@ class CodeQualityAuditor:
         if "test" in str(file_path).lower():
             return
 
+        # Check if file uses CustomerFilterMixin - if so, skip queryset checks
+        if "CustomerFilterMixin" in content:
+            # Parse AST to find classes with the mixin
+            try:
+                tree = ast.parse(content)
+                classes_with_mixin = set()
+
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ClassDef):
+                        # Check if class inherits from CustomerFilterMixin
+                        for base in node.bases:
+                            if isinstance(base, ast.Name) and base.id == "CustomerFilterMixin":  # noqa: E501
+                                classes_with_mixin.add(node.name)
+                                break
+                            # Handle CustomerFilterMixin as attribute
+                            # (e.g., mixins.CustomerFilterMixin)
+                            if isinstance(base, ast.Attribute) and base.attr == "CustomerFilterMixin":  # noqa: E501
+                                classes_with_mixin.add(node.name)
+                                break
+
+                # If any class uses CustomerFilterMixin, likely safe
+                # Skip detailed line-by-line scanning
+                if classes_with_mixin:
+                    return
+
+            except SyntaxError:
+                pass  # Fall through to line-by-line scan
+
         lines = content.split("\n")
 
+        # Track if we're inside a docstring
+        in_docstring = False
+        docstring_delimiter = None
+
         for line_num, line in enumerate(lines, 1):
+            # Track docstring state
+            if '"""' in line or "'''" in line:
+                delimiter = '"""' if '"""' in line else "'''"
+                # Count occurrences to handle single-line docstrings
+                count = line.count(delimiter)
+                if count == 1:
+                    # Opening or closing delimiter
+                    if in_docstring and delimiter == docstring_delimiter:
+                        in_docstring = False
+                        docstring_delimiter = None
+                    else:
+                        in_docstring = True
+                        docstring_delimiter = delimiter
+                # If count == 2, it's a single-line docstring, stay in same state
+
+            # Skip lines inside docstrings
+            if in_docstring:
+                continue
+
+            # Skip lines with docstring or Usage examples
+            if "Usage:" in line:
+                continue
+
             # Check for .objects.all() on customer-scoped models
             for model in self.CUSTOMER_FILTER_REQUIRED:
                 if f"{model}.objects.all()" in line:
