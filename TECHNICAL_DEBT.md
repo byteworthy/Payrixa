@@ -363,27 +363,34 @@ fi
 
 *(Top 10 shown, see full report for complete list)*
 
-### HIGH-1: JWT Token Blacklist Not Configured
+### ~~HIGH-1: JWT Token Blacklist Not Configured~~ ✅ RESOLVED
 **Domain**: Security
-**File**: upstream/settings/base.py:156
+**File**: upstream/settings/base.py:33
 **Impact**: Old tokens remain valid indefinitely
 **Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
 
-**Fix**: Add to INSTALLED_APPS:
-```python
-"rest_framework_simplejwt.token_blacklist",
-```
-Run: `python manage.py migrate token_blacklist`
+**Resolution**:
+- Added `rest_framework_simplejwt.token_blacklist` to INSTALLED_APPS
+- Ran migrations to create blacklist tables (OutstandingToken, BlacklistedToken)
+- JWT tokens are now properly invalidated after rotation
+- Prevents token reuse after logout or refresh
 
 ---
 
-### HIGH-2: Missing Rate Limiting on Auth Endpoints
+### ~~HIGH-2: Missing Rate Limiting on Auth Endpoints~~ ✅ RESOLVED
 **Domain**: Security
-**File**: upstream/api/urls.py:58-60
+**File**: upstream/api/urls.py:54-60, upstream/api/throttling.py:73-80, upstream/api/views.py:736-758
 **Impact**: Brute-force password attacks possible
 **Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
 
-**Fix**: Apply strict throttling (5 attempts/15 minutes)
+**Resolution**:
+- Created `AuthenticationThrottle` class limiting auth requests to 5 per 15 minutes
+- Implemented throttled JWT views (ThrottledTokenObtainPairView, ThrottledTokenRefreshView, ThrottledTokenVerifyView)
+- Updated auth URLs to use throttled views instead of default SimpleJWT views
+- Added rate configuration to DEFAULT_THROTTLE_RATES: `"authentication": "5/15min"`
+- Prevents brute-force password attacks while allowing legitimate login retries
 
 ---
 
@@ -413,13 +420,19 @@ Run: `python manage.py migrate token_blacklist`
 
 ---
 
-### HIGH-6: Security Scanners Don't Block CI
+### ~~HIGH-6: Security Scanners Don't Block CI~~ ✅ RESOLVED
 **Domain**: DevOps
-**File**: .github/workflows/security.yml:31-33
+**File**: .github/workflows/security.yml:32, 37
 **Impact**: Vulnerable code can be merged
 **Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
 
-**Fix**: Remove `|| true` from Bandit/pip-audit
+**Resolution**:
+- Removed `|| true` from Bandit security linter step (line 32)
+- Removed `|| true` from pip-audit dependency scanner step (line 37)
+- Security vulnerabilities now cause CI pipeline failures
+- Prevents vulnerable code from being merged to main branch
+- Maintains security reports upload for review even on failures
 
 ---
 
@@ -431,13 +444,19 @@ Run: `python manage.py migrate token_blacklist`
 
 ---
 
-### HIGH-8: AlertEventViewSet Allows DELETE
+### ~~HIGH-8: AlertEventViewSet Allows DELETE~~ ✅ RESOLVED
 **Domain**: API
-**File**: upstream/api/views.py:469
+**File**: upstream/api/views.py:508
 **Impact**: Audit trail can be deleted
 **Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
 
-**Fix**: Change to ReadOnlyModelViewSet
+**Resolution**:
+- Changed AlertEventViewSet from `ModelViewSet` to `ReadOnlyModelViewSet`
+- Prevents DELETE, POST, PUT, PATCH operations on alert events
+- Custom `feedback` action still works for operator judgments (POST to /feedback/)
+- Preserves HIPAA-required audit trail integrity
+- Alert events can now only be created by system, not manually via API
 
 ---
 
@@ -451,13 +470,20 @@ Run: `python manage.py migrate token_blacklist`
 
 ---
 
-### HIGH-10: No Container Vulnerability Scanning
+### ~~HIGH-10: No Container Vulnerability Scanning~~ ✅ RESOLVED
 **Domain**: DevOps
-**File**: .github/workflows/docker.yml:20-27
+**File**: .github/workflows/docker.yml:30-44
 **Impact**: Vulnerable packages in production
 **Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
 
-**Fix**: Add Trivy scanning step
+**Resolution**:
+- Added Trivy vulnerability scanner using `aquasecurity/trivy-action@master`
+- Scans Docker image for CRITICAL and HIGH severity vulnerabilities
+- Configured to fail build (exit-code: 1) if vulnerabilities found
+- Uploads SARIF results to GitHub Security tab for tracking
+- Results available in GitHub Security > Code Scanning Alerts
+- Prevents deployment of containers with known vulnerabilities
 
 ---
 
@@ -664,29 +690,31 @@ Run: `python manage.py migrate token_blacklist`
 
 ## Progress Tracking
 
-**Current Status**: Phase 1 - COMPLETE (10/10 Critical Issues Resolved - 100%) ✅
+**Current Status**: Phase 2 - IN PROGRESS (15/43 Critical+High Issues Resolved - 34.9%) 🚧
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 121 | 92.4% |
+| To Do | 116 | 88.5% |
 | In Progress | 0 | 0% |
-| Done | 10 | 7.6% |
+| Done | 15 | 11.5% |
 
 ### By Domain Completion
 
 | Domain | Issues | Fixed | % Complete |
 |--------|--------|-------|------------|
-| Security | 10 | 0 | 0% |
+| Security | 10 | 2 | 20.0% |
 | Performance | 18 | 3 | 16.7% |
 | Testing | 17 | 1 | 5.9% |
 | Architecture | 21 | 0 | 0% |
 | Database | 22 | 2 | 9.1% |
-| API | 23 | 0 | 0% |
-| DevOps | 30 | 4 | 13.3% |
+| API | 23 | 1 | 4.3% |
+| DevOps | 30 | 6 | 20.0% |
 
-### Recently Completed (2026-01-26) - Phase 1 Complete!
+### Recently Completed (2026-01-26)
+
+**Phase 1 - Critical Issues (10/10 - 100%)** ✅
 - ✅ **CRIT-1**: Database backups before deployment (cloudbuild.yaml)
 - ✅ **CRIT-2**: Migration safety checks in CI/CD (.github/workflows/deploy.yml)
 - ✅ **CRIT-3**: TextField to CharField with indexes for payer/CPT (upstream/models.py)
@@ -697,6 +725,13 @@ Run: `python manage.py migrate token_blacklist`
 - ✅ **CRIT-8**: CASCADE delete on Upload breaking audit trail (upstream/models.py)
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 - ✅ **CRIT-10**: No rollback strategy in deployments (cloudbuild.yaml, scripts/smoke_test.py)
+
+**Phase 2 - High Priority Issues (5/33 - 15.2%)** 🚧
+- ✅ **HIGH-1**: JWT token blacklist configuration (upstream/settings/base.py)
+- ✅ **HIGH-2**: Rate limiting on auth endpoints (upstream/api/throttling.py, views.py, urls.py)
+- ✅ **HIGH-6**: Security scanners block CI (.github/workflows/security.yml)
+- ✅ **HIGH-8**: AlertEventViewSet audit trail protection (upstream/api/views.py)
+- ✅ **HIGH-10**: Container vulnerability scanning (.github/workflows/docker.yml)
 
 ---
 
