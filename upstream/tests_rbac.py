@@ -2,13 +2,11 @@
 Tests for RBAC (Role-Based Access Control) system.
 """
 
-from django.test import TestCase, RequestFactory
+from django.test import TestCase
 from django.contrib.auth.models import User
-from django.http import HttpResponseForbidden
 from upstream.models import Customer, UserProfile
 from upstream.permissions import (
     has_permission,
-    get_user_profile,
     validate_role_change,
     validate_remove_member,
     is_last_owner,
