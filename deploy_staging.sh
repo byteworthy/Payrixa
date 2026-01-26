@@ -98,6 +98,26 @@ check_prerequisites() {
     log_success "Prerequisites check passed"
 }
 
+secure_env_files() {
+    log_info "Securing .env file permissions..."
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY RUN] Would secure .env file permissions"
+        return
+    fi
+
+    # List of .env files to secure
+    ENV_FILES=(".env" ".env.production")
+
+    for env_file in "${ENV_FILES[@]}"; do
+        if [ -f "$env_file" ]; then
+            # Set permissions to 600 (owner read/write only)
+            chmod 600 "$env_file"
+            log_success "$env_file permissions set to 600 (owner-only)"
+        fi
+    done
+}
+
 backup_database() {
     log_info "Creating database backup..."
 
@@ -292,6 +312,7 @@ main() {
 
     # Pre-deployment checks
     check_prerequisites
+    secure_env_files
 
     # Deployment steps
     backup_database

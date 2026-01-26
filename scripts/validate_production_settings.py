@@ -22,29 +22,32 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'upstream.settings.prod')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "upstream.settings.prod")
 
-import django
+import django  # noqa: E402
+
 django.setup()
 
-from django.conf import settings
-from django.core.management import call_command
-from io import StringIO
+from django.conf import settings  # noqa: E402
+from django.core.management import call_command  # noqa: E402
+from io import StringIO  # noqa: E402
 
 
 class Colors:
     """ANSI color codes for terminal output."""
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    BOLD = '\033[1m'
-    END = '\033[0m'
+
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    BOLD = "\033[1m"
+    END = "\033[0m"
 
 
 class ValidationResult:
     """Result of a validation check."""
-    def __init__(self, name, status, message, severity='error'):
+
+    def __init__(self, name, status, message, severity="error"):
         self.name = name
         self.status = status  # 'pass', 'fail', 'warn'
         self.message = message
@@ -60,25 +63,25 @@ class ProductionValidator:
         self.errors = 0
         self.warnings = 0
 
-    def check(self, name, condition, pass_msg, fail_msg, severity='error'):
+    def check(self, name, condition, pass_msg, fail_msg, severity="error"):
         """Perform a validation check."""
         if condition:
-            self.results.append(ValidationResult(name, 'pass', pass_msg, severity))
+            self.results.append(ValidationResult(name, "pass", pass_msg, severity))
         else:
-            self.results.append(ValidationResult(name, 'fail', fail_msg, severity))
-            if severity == 'critical':
+            self.results.append(ValidationResult(name, "fail", fail_msg, severity))
+            if severity == "critical":
                 self.critical_failures += 1
-            elif severity == 'error':
+            elif severity == "error":
                 self.errors += 1
-            elif severity == 'warning':
+            elif severity == "warning":
                 self.warnings += 1
 
     def warn(self, name, condition, pass_msg, warn_msg):
         """Perform a warning check."""
         if condition:
-            self.results.append(ValidationResult(name, 'pass', pass_msg, 'info'))
+            self.results.append(ValidationResult(name, "pass", pass_msg, "info"))
         else:
-            self.results.append(ValidationResult(name, 'warn', warn_msg, 'warning'))
+            self.results.append(ValidationResult(name, "warn", warn_msg, "warning"))
             self.warnings += 1
 
     def validate_all(self):
@@ -89,6 +92,7 @@ class ProductionValidator:
 
         self.validate_django_core()
         self.validate_security()
+        self.validate_env_file_security()
         self.validate_database()
         self.validate_cache()
         self.validate_email()
@@ -108,25 +112,29 @@ class ProductionValidator:
             not settings.DEBUG,
             "DEBUG is correctly set to False",
             "CRITICAL: DEBUG is True! Never deploy with DEBUG=True",
-            severity='critical'
+            severity="critical",
         )
 
         # SECRET_KEY must be strong
         self.check(
             "SECRET_KEY Strength",
-            len(settings.SECRET_KEY) >= 50 and not settings.SECRET_KEY.startswith('django-insecure'),
+            len(settings.SECRET_KEY) >= 50
+            and not settings.SECRET_KEY.startswith("django-insecure"),
             f"SECRET_KEY is strong ({len(settings.SECRET_KEY)} characters)",
-            f"CRITICAL: SECRET_KEY is weak ({len(settings.SECRET_KEY)} chars). Generate a new one!",
-            severity='critical'
+            (
+                f"CRITICAL: SECRET_KEY is weak "
+                f"({len(settings.SECRET_KEY)} chars). Generate a new one!"
+            ),
+            severity="critical",
         )
 
         # ALLOWED_HOSTS must be set
         self.check(
             "ALLOWED_HOSTS",
-            len(settings.ALLOWED_HOSTS) > 0 and '*' not in settings.ALLOWED_HOSTS,
+            len(settings.ALLOWED_HOSTS) > 0 and "*" not in settings.ALLOWED_HOSTS,
             f"ALLOWED_HOSTS configured: {', '.join(settings.ALLOWED_HOSTS)}",
             "CRITICAL: ALLOWED_HOSTS not configured or contains wildcard",
-            severity='critical'
+            severity="critical",
         )
 
         print()
@@ -141,7 +149,7 @@ class ProductionValidator:
             settings.SECURE_SSL_REDIRECT,
             "HTTPS redirect enabled",
             "ERROR: SECURE_SSL_REDIRECT is False. HTTPS should be enforced!",
-            severity='error'
+            severity="error",
         )
 
         self.check(
@@ -149,7 +157,7 @@ class ProductionValidator:
             settings.SESSION_COOKIE_SECURE,
             "Session cookies are secure (HTTPS only)",
             "ERROR: SESSION_COOKIE_SECURE is False. Cookies can be intercepted!",
-            severity='error'
+            severity="error",
         )
 
         self.check(
@@ -157,7 +165,7 @@ class ProductionValidator:
             settings.CSRF_COOKIE_SECURE,
             "CSRF cookies are secure (HTTPS only)",
             "ERROR: CSRF_COOKIE_SECURE is False. CSRF tokens can be stolen!",
-            severity='error'
+            severity="error",
         )
 
         # HSTS
@@ -166,16 +174,49 @@ class ProductionValidator:
             settings.SECURE_HSTS_SECONDS > 0,
             f"HSTS enabled for {settings.SECURE_HSTS_SECONDS} seconds",
             "WARNING: HSTS not configured. Consider enabling for production.",
-            severity='warning'
+            severity="warning",
         )
 
         # CSRF Trusted Origins
         self.warn(
             "CSRF Trusted Origins",
-            hasattr(settings, 'CSRF_TRUSTED_ORIGINS') and len(settings.CSRF_TRUSTED_ORIGINS) > 0,
+            hasattr(settings, "CSRF_TRUSTED_ORIGINS")
+            and len(settings.CSRF_TRUSTED_ORIGINS) > 0,
             f"CSRF trusted origins configured: {len(settings.CSRF_TRUSTED_ORIGINS)}",
-            "CSRF_TRUSTED_ORIGINS not set (may be needed for reverse proxy)"
+            "CSRF_TRUSTED_ORIGINS not set (may be needed for reverse proxy)",
         )
+
+        print()
+
+    def validate_env_file_security(self):
+        """Validate .env file permissions."""
+        import stat
+
+        print(f"{Colors.BLUE}🔐 Validating .env File Security...{Colors.END}")
+
+        env_files = [".env", ".env.production", ".env.local"]
+
+        for env_name in env_files:
+            env_path = PROJECT_ROOT / env_name
+            if env_path.exists():
+                mode = env_path.stat().st_mode
+                current_perms = oct(stat.S_IMODE(mode))[-3:]
+
+                # Check for group or other access
+                has_group_access = bool(mode & stat.S_IRWXG)
+                has_other_access = bool(mode & stat.S_IRWXO)
+                is_secure = not (has_group_access or has_other_access)
+
+                self.check(
+                    f"{env_name} Permissions",
+                    is_secure,
+                    f"Secure permissions ({current_perms})",
+                    (
+                        f"CRITICAL: Insecure permissions ({current_perms}). "
+                        f"Run: chmod 600 {env_name}"
+                    ),
+                    severity="critical",
+                )
 
         print()
 
@@ -183,33 +224,33 @@ class ProductionValidator:
         """Validate database configuration."""
         print(f"{Colors.BLUE}💾 Validating Database Settings...{Colors.END}")
 
-        db_config = settings.DATABASES.get('default', {})
+        db_config = settings.DATABASES.get("default", {})
 
         # Database engine
         self.check(
             "Database Engine",
-            'postgresql' in db_config.get('ENGINE', '').lower(),
+            "postgresql" in db_config.get("ENGINE", "").lower(),
             f"Using PostgreSQL: {db_config.get('ENGINE')}",
             "ERROR: Not using PostgreSQL. SQLite is not suitable for production!",
-            severity='error'
+            severity="error",
         )
 
         # Database host
         self.check(
             "Database Host",
-            db_config.get('HOST') not in ['', 'localhost', '127.0.0.1'],
+            db_config.get("HOST") not in ["", "localhost", "127.0.0.1"],
             f"Database host: {db_config.get('HOST')}",
             "WARNING: Database appears to be on localhost. Consider managed database.",
-            severity='warning'
+            severity="warning",
         )
 
         # SSL mode
-        ssl_mode = db_config.get('OPTIONS', {}).get('sslmode')
+        ssl_mode = db_config.get("OPTIONS", {}).get("sslmode")
         self.warn(
             "Database SSL",
-            ssl_mode in ['require', 'verify-ca', 'verify-full'],
+            ssl_mode in ["require", "verify-ca", "verify-full"],
             f"Database SSL mode: {ssl_mode}",
-            "Database SSL not configured (recommended for production)"
+            "Database SSL not configured (recommended for production)",
         )
 
         print()
@@ -218,15 +259,15 @@ class ProductionValidator:
         """Validate cache configuration."""
         print(f"{Colors.BLUE}⚡ Validating Cache Settings...{Colors.END}")
 
-        cache_config = settings.CACHES.get('default', {})
-        backend = cache_config.get('BACKEND', '')
+        cache_config = settings.CACHES.get("default", {})
+        backend = cache_config.get("BACKEND", "")
 
         # Should use Redis in production
         self.warn(
             "Cache Backend",
-            'redis' in backend.lower(),
+            "redis" in backend.lower(),
             f"Using Redis cache: {backend}",
-            f"Using local memory cache. Redis recommended for production."
+            "Using local memory cache. Redis recommended for production.",
         )
 
         print()
@@ -238,27 +279,31 @@ class ProductionValidator:
         # Email backend
         self.warn(
             "Email Backend",
-            'console' not in settings.EMAIL_BACKEND.lower(),
+            "console" not in settings.EMAIL_BACKEND.lower(),
             f"Email backend configured: {settings.EMAIL_BACKEND}",
-            "Using console email backend (emails won't be sent)"
+            "Using console email backend (emails won't be sent)",
         )
 
         # Default from email
         self.check(
             "Default From Email",
-            settings.DEFAULT_FROM_EMAIL and '@' in settings.DEFAULT_FROM_EMAIL,
+            settings.DEFAULT_FROM_EMAIL and "@" in settings.DEFAULT_FROM_EMAIL,
             f"From email: {settings.DEFAULT_FROM_EMAIL}",
             "ERROR: DEFAULT_FROM_EMAIL not configured",
-            severity='error'
+            severity="error",
         )
 
         # Portal base URL
         self.check(
             "Portal Base URL",
-            settings.PORTAL_BASE_URL and settings.PORTAL_BASE_URL.startswith('https://'),
+            settings.PORTAL_BASE_URL
+            and settings.PORTAL_BASE_URL.startswith("https://"),
             f"Portal URL: {settings.PORTAL_BASE_URL}",
-            "ERROR: PORTAL_BASE_URL not configured or not HTTPS (email links will break)",
-            severity='error'
+            (
+                "ERROR: PORTAL_BASE_URL not configured or not HTTPS "
+                "(email links will break)"
+            ),
+            severity="error",
         )
 
         print()
@@ -268,33 +313,33 @@ class ProductionValidator:
         print(f"{Colors.BLUE}🏥 Validating PHI Compliance...{Colors.END}")
 
         # Check if handling real PHI
-        real_data_mode = getattr(settings, 'REAL_DATA_MODE', False)
+        real_data_mode = getattr(settings, "REAL_DATA_MODE", False)
 
         if real_data_mode:
             # Encryption key required
-            encryption_key = getattr(settings, 'FIELD_ENCRYPTION_KEY', '')
+            encryption_key = getattr(settings, "FIELD_ENCRYPTION_KEY", "")
             self.check(
                 "Field Encryption Key",
                 len(encryption_key) >= 32,
                 "Field encryption key configured (PHI protection enabled)",
                 "CRITICAL: REAL_DATA_MODE=True but FIELD_ENCRYPTION_KEY not set!",
-                severity='critical'
+                severity="critical",
             )
         else:
             self.warn(
                 "Real Data Mode",
                 False,  # Always show this as info
                 "REAL_DATA_MODE=False (using synthetic data)",
-                "REAL_DATA_MODE=False (ensure this is correct for your deployment)"
+                "REAL_DATA_MODE=False (ensure this is correct for your deployment)",
             )
 
         # Audit logging
         self.check(
             "Audit Logging",
-            'auditlog' in settings.INSTALLED_APPS,
+            "auditlog" in settings.INSTALLED_APPS,
             "Audit logging enabled (HIPAA compliance)",
             "ERROR: Audit logging not enabled",
-            severity='error'
+            severity="error",
         )
 
         print()
@@ -306,28 +351,28 @@ class ProductionValidator:
         # Capture Django check output
         output = StringIO()
         try:
-            call_command('check', '--deploy', stdout=output, stderr=output)
+            call_command("check", "--deploy", stdout=output, stderr=output)
             output_str = output.getvalue()
 
             # Count warnings
-            warning_count = output_str.count('?:')
+            warning_count = output_str.count("?:")
 
             if warning_count == 0:
                 self.results.append(
                     ValidationResult(
                         "Django Deployment Check",
-                        'pass',
+                        "pass",
                         "No Django deployment warnings",
-                        'info'
+                        "info",
                     )
                 )
             else:
                 self.results.append(
                     ValidationResult(
                         "Django Deployment Check",
-                        'warn',
+                        "warn",
                         f"{warning_count} Django deployment warnings (see above)",
-                        'warning'
+                        "warning",
                     )
                 )
                 self.warnings += 1
@@ -336,9 +381,9 @@ class ProductionValidator:
             self.results.append(
                 ValidationResult(
                     "Django Deployment Check",
-                    'fail',
+                    "fail",
                     f"Error running deployment check: {str(e)}",
-                    'error'
+                    "error",
                 )
             )
             self.errors += 1
@@ -353,14 +398,14 @@ class ProductionValidator:
 
         # Print all results
         for result in self.results:
-            if result.status == 'pass':
+            if result.status == "pass":
                 icon = f"{Colors.GREEN}✓{Colors.END}"
                 color = Colors.GREEN
-            elif result.status == 'warn':
+            elif result.status == "warn":
                 icon = f"{Colors.YELLOW}⚠{Colors.END}"
                 color = Colors.YELLOW
             else:  # fail
-                if result.severity == 'critical':
+                if result.severity == "critical":
                     icon = f"{Colors.RED}✗{Colors.END}"
                     color = Colors.RED
                 else:
@@ -375,13 +420,16 @@ class ProductionValidator:
         print(f"{Colors.BOLD}{'='*70}{Colors.END}")
 
         total = len(self.results)
-        passed = sum(1 for r in self.results if r.status == 'pass')
+        passed = sum(1 for r in self.results if r.status == "pass")
 
         print(f"Total Checks: {total}")
         print(f"{Colors.GREEN}Passed: {passed}{Colors.END}")
 
         if self.critical_failures > 0:
-            print(f"{Colors.RED}{Colors.BOLD}Critical Failures: {self.critical_failures}{Colors.END}")
+            print(
+                f"{Colors.RED}{Colors.BOLD}Critical Failures: "
+                f"{self.critical_failures}{Colors.END}"
+            )
         if self.errors > 0:
             print(f"{Colors.RED}Errors: {self.errors}{Colors.END}")
         if self.warnings > 0:
@@ -393,18 +441,35 @@ class ProductionValidator:
         """Get exit code based on validation results."""
         if self.critical_failures > 0:
             print(f"{Colors.RED}{Colors.BOLD}DEPLOYMENT BLOCKED:{Colors.END} ")
-            print(f"{Colors.RED}Critical security issues must be fixed before deployment.{Colors.END}\n")
+            print(
+                f"{Colors.RED}Critical security issues must be fixed "
+                f"before deployment.{Colors.END}\n"
+            )
             return 1
         elif self.errors > 0:
-            print(f"{Colors.RED}{Colors.BOLD}DEPLOYMENT NOT RECOMMENDED:{Colors.END} ")
-            print(f"{Colors.RED}Security errors detected. Fix before deploying to production.{Colors.END}\n")
+            print(
+                f"{Colors.RED}{Colors.BOLD}" f"DEPLOYMENT NOT RECOMMENDED:{Colors.END} "
+            )
+            print(
+                f"{Colors.RED}Security errors detected. "
+                f"Fix before deploying to production.{Colors.END}\n"
+            )
             return 1
         elif self.warnings > 0:
-            print(f"{Colors.YELLOW}{Colors.BOLD}DEPLOYMENT ALLOWED WITH CAUTION:{Colors.END} ")
-            print(f"{Colors.YELLOW}Warnings detected. Review before deploying to production.{Colors.END}\n")
+            print(
+                f"{Colors.YELLOW}{Colors.BOLD}"
+                f"DEPLOYMENT ALLOWED WITH CAUTION:{Colors.END} "
+            )
+            print(
+                f"{Colors.YELLOW}Warnings detected. "
+                f"Review before deploying to production.{Colors.END}\n"
+            )
             return 2
         else:
-            print(f"{Colors.GREEN}{Colors.BOLD}✓ READY FOR PRODUCTION DEPLOYMENT{Colors.END}")
+            print(
+                f"{Colors.GREEN}{Colors.BOLD}"
+                f"✓ READY FOR PRODUCTION DEPLOYMENT{Colors.END}"
+            )
             print(f"{Colors.GREEN}All security checks passed!{Colors.END}\n")
             return 0
 
@@ -416,5 +481,5 @@ def main():
     sys.exit(exit_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

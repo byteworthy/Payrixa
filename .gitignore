@@ -2,6 +2,9 @@ db.sqlite3
 __pycache__/
 staticfiles/
 .env
+.env.production
+.env.local
+.env.*.local
 venv/
 logs/
 *.log
