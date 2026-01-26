@@ -81,6 +81,7 @@ None yet.
 | 001 | Add Prometheus metrics endpoint for production monitoring | 2026-01-26 | a1c9ce94, 9b49e8b2 | [001-add-prometheus-metrics-endpoint-for-pro](./quick/001-add-prometheus-metrics-endpoint-for-pro/) |
 | 002 | Enable structured JSON logging for better log aggregation | 2026-01-26 | 1c677db8, ea9884d3 | [002-enable-structured-json-logging-for-bett](./quick/002-enable-structured-json-logging-for-bett/) |
 | 004 | Configure log retention policy for HIPAA compliance | 2026-01-26 | 14cfe180, 842a97ea, ceadda09, 1d0761b6 | [004-configure-log-retention-policy-for-hipa](./quick/004-configure-log-retention-policy-for-hipa/) |
+| 007 | Add API versioning headers via middleware | 2026-01-26 | 0c2df206, 81a56c5f, 275a343b | [007-add-api-versioning-headers-via-middlewar](./quick/007-add-api-versioning-headers-via-middlewar/) |
 | 007 | Add API versioning headers via middleware | 2026-01-26 | 0c2df206, 81a56c5f | [007-add-api-versioning-headers-via-middlewar](./quick/007-add-api-versioning-headers-via-middlewar/) |
 
 ### Blockers/Concerns
