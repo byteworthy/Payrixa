@@ -2,496 +2,724 @@
 
 ## Overview
 
-The Upstream Healthcare platform exposes Prometheus-formatted metrics at the `/metrics` endpoint for comprehensive operational monitoring. This includes HTTP request metrics, database performance, and custom business metrics for healthcare operations.
+The Upstream Healthcare Revenue Intelligence platform exposes comprehensive metrics at the `/metrics` endpoint in Prometheus exposition format. These metrics provide visibility into application performance, database operations, and critical business operations for healthcare claims processing.
 
 ## Endpoint Access
 
-**URL:** `http://your-domain.com/metrics`
+**URL:** `http://<your-host>:8000/metrics`
 
-**Method:** GET
+**Method:** `GET`
 
-**Authentication:** Public (configure firewall rules to restrict access to Prometheus servers only)
+**Authentication:** None (configure firewall rules to restrict access to Prometheus server only)
 
 **Content-Type:** `text/plain; version=0.0.4` (Prometheus exposition format)
 
+**Response Format:** Prometheus text-based exposition format with metric families, types, and labels
+
 ## Prometheus Scrape Configuration
 
-Add this configuration to your `prometheus.yml` file:
+Add this configuration to your `prometheus.yml`:
 
 ```yaml
 scrape_configs:
   - job_name: 'django-upstream'
     static_configs:
-      - targets: ['app:8000']
+      - targets: ['app:8000']  # Adjust hostname/port for your deployment
     metrics_path: '/metrics'
     scrape_interval: 15s
     scrape_timeout: 10s
+
+    # Optional: Add labels for multi-environment monitoring
+    # labels:
+    #   environment: 'production'
+    #   service: 'upstream-api'
 ```
 
-For Kubernetes deployments:
+For Kubernetes deployments, use ServiceMonitor or PodMonitor:
 
 ```yaml
-scrape_configs:
-  - job_name: 'upstream-production'
-    kubernetes_sd_configs:
-      - role: pod
-        namespaces:
-          names:
-            - upstream
-    relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_label_app]
-        action: keep
-        regex: upstream-api
-    metrics_path: '/metrics'
-    scrape_interval: 15s
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: upstream-metrics
+spec:
+  selector:
+    matchLabels:
+      app: upstream
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
 ```
 
 ## Metric Categories
 
 ### 1. HTTP Request Metrics (django-prometheus)
 
-Django-prometheus automatically tracks all HTTP requests and responses.
+These metrics track all HTTP requests handled by Django:
 
-#### Request Rates
+#### `django_http_requests_total_by_view_transport_method_total`
+- **Type:** Counter
+- **Labels:** `view`, `transport`, `method`
+- **Description:** Total count of HTTP requests grouped by Django view, transport protocol, and HTTP method
+- **Example:** `django_http_requests_total_by_view_transport_method_total{method="GET",transport="http",view="upstream.api.views.ClaimViewSet"}`
 
-**`django_http_requests_total_by_method_total`**
-- Description: Total count of HTTP requests by method
-- Type: Counter
-- Labels: `method` (GET, POST, PUT, DELETE, PATCH)
+#### `django_http_responses_total_by_status_view_method_total`
+- **Type:** Counter
+- **Labels:** `status`, `view`, `method`
+- **Description:** Total count of HTTP responses grouped by status code, view, and method
+- **Use Case:** Error rate monitoring (track 4xx and 5xx responses)
+- **Example:** `django_http_responses_total_by_status_view_method_total{method="POST",status="400",view="upstream.api.views.ClaimViewSet"}`
 
-**`django_http_requests_total_by_transport_total`**
-- Description: Total count of HTTP requests by transport protocol
-- Type: Counter
-- Labels: `transport` (http, https)
+#### `django_http_requests_latency_seconds_by_view_method`
+- **Type:** Histogram
+- **Labels:** `view`, `method`
+- **Buckets:** [0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, +Inf]
+- **Description:** Request latency distribution (time to process requests)
+- **Use Case:** Performance monitoring, P95/P99 latency tracking
+- **Example:** `histogram_quantile(0.95, rate(django_http_requests_latency_seconds_bucket[5m]))`
 
-**`django_http_requests_total_by_view_transport_method`**
-- Description: Total count of HTTP requests by view, transport, and method
-- Type: Counter
-- Labels: `view`, `transport`, `method`
+#### `django_http_requests_body_total_bytes`
+- **Type:** Counter
+- **Labels:** None
+- **Description:** Total bytes received in HTTP request bodies
+- **Use Case:** Network traffic monitoring
 
-#### Response Status
+#### `django_http_responses_body_total_bytes`
+- **Type:** Counter
+- **Labels:** None
+- **Description:** Total bytes sent in HTTP response bodies
+- **Use Case:** Network bandwidth monitoring
 
-**`django_http_responses_total_by_status_view_method`**
-- Description: Total count of HTTP responses by status code, view, and method
-- Type: Counter
-- Labels: `status` (200, 201, 400, 401, 403, 404, 500, etc.), `view`, `method`
+### 2. Database Query Metrics (django-prometheus)
 
-**`django_http_responses_total_by_status`**
-- Description: Total count of HTTP responses by status code
-- Type: Counter
-- Labels: `status`
+These metrics provide visibility into database operations:
 
-#### Latency
+#### `django_db_query_duration_seconds`
+- **Type:** Histogram
+- **Labels:** `vendor` (postgresql, sqlite, etc.)
+- **Buckets:** [0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, +Inf]
+- **Description:** Database query execution time distribution
+- **Use Case:** Identify slow queries, optimize database performance
+- **Example:** `histogram_quantile(0.99, rate(django_db_query_duration_seconds_bucket[10m]))`
 
-**`django_http_requests_latency_seconds_by_view_method`**
-- Description: Histogram of request processing time by view and method
-- Type: Histogram
-- Labels: `view`, `method`
-- Buckets: 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, 25.0, 50.0, 75.0, +Inf
+#### `django_db_execute_total`
+- **Type:** Counter
+- **Labels:** `vendor`
+- **Description:** Total number of database queries executed
+- **Use Case:** Query volume tracking, N+1 query detection
 
-**`django_http_requests_latency_including_middlewares_seconds`**
-- Description: Histogram of total request processing time including middleware
-- Type: Histogram
-- Buckets: Same as above
+#### `django_db_execute_many_total`
+- **Type:** Counter
+- **Labels:** `vendor`
+- **Description:** Total number of bulk database operations (executemany)
+- **Use Case:** Batch operation monitoring
 
-### 2. Database Metrics (django-prometheus)
+### 3. Django Model Metrics (django-prometheus)
 
-#### Query Performance
+Track model-level operations:
 
-**`django_db_query_duration_seconds`**
-- Description: Histogram of database query execution time
-- Type: Histogram
-- Labels: `database` (default), `query_type` (SELECT, INSERT, UPDATE, DELETE)
-- Buckets: 0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0
+#### `django_model_inserts_total`
+- **Type:** Counter
+- **Labels:** `model`
+- **Description:** Total number of INSERT operations by model
+- **Example:** `django_model_inserts_total{model="upstream.Claim"}`
 
-**`django_db_query_count_total`**
-- Description: Total count of database queries executed
-- Type: Counter
-- Labels: `database`, `query_type`
+#### `django_model_updates_total`
+- **Type:** Counter
+- **Labels:** `model`
+- **Description:** Total number of UPDATE operations by model
 
-#### Connection Pool
+#### `django_model_deletes_total`
+- **Type:** Counter
+- **Labels:** `model`
+- **Description:** Total number of DELETE operations by model
 
-**`django_db_connections_total`**
-- Description: Total number of database connections opened
-- Type: Counter
-- Labels: `database`
-
-**`django_db_connections_active`**
-- Description: Current number of active database connections
-- Type: Gauge
-- Labels: `database`
-
-#### Model Operations
-
-**`django_model_inserts_total`**
-- Description: Total count of model insert operations
-- Type: Counter
-- Labels: `model`
-
-**`django_model_updates_total`**
-- Description: Total count of model update operations
-- Type: Counter
-- Labels: `model`
-
-**`django_model_deletes_total`**
-- Description: Total count of model delete operations
-- Type: Counter
-- Labels: `model`
-
-### 3. Custom Business Metrics
+### 4. Custom Business Metrics (upstream)
 
 #### Alert Metrics
 
-**`upstream_alert_created_total`**
-- Description: Total number of alert events created
-- Type: Counter
-- Labels: `product` (DriftWatch, DelayGuard, DenialScope), `severity` (low, medium, high, critical), `customer_id`
+##### `upstream_alert_created_total`
+- **Type:** Counter
+- **Labels:** `product`, `severity`, `customer_id`
+- **Description:** Total number of alert events created
+- **Products:** `DriftWatch`, `DelayGuard`, `DenialScope`
+- **Severities:** `low`, `medium`, `high`, `critical`
+- **Example:** `rate(upstream_alert_created_total{product="DriftWatch",severity="high"}[1h])`
 
-**`upstream_alert_delivered_total`**
-- Description: Total number of alert notifications successfully delivered
-- Type: Counter
-- Labels: `product`, `channel_type` (email, slack, webhook), `customer_id`
+##### `upstream_alert_delivered_total`
+- **Type:** Counter
+- **Labels:** `product`, `channel_type`, `customer_id`
+- **Description:** Total number of alert notifications successfully delivered
+- **Channels:** `email`, `slack`, `webhook`
 
-**`upstream_alert_failed_total`**
-- Description: Total number of alert notification failures
-- Type: Counter
-- Labels: `product`, `channel_type`, `error_type`, `customer_id`
+##### `upstream_alert_failed_total`
+- **Type:** Counter
+- **Labels:** `product`, `channel_type`, `error_type`, `customer_id`
+- **Description:** Total number of alert notification failures
+- **Use Case:** Monitor alert delivery reliability
 
-**`upstream_alert_processing_seconds`**
-- Description: Time spent processing and sending alerts
-- Type: Histogram
-- Labels: `product`
-- Buckets: 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0
+##### `upstream_alert_processing_seconds`
+- **Type:** Histogram
+- **Labels:** `product`
+- **Buckets:** [0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, +Inf]
+- **Description:** Time spent processing and sending alerts
+- **Use Case:** Alert latency monitoring
 
-**`upstream_alert_suppressed_total`**
-- Description: Total number of alerts suppressed due to cooldown or noise patterns
-- Type: Counter
-- Labels: `product`, `reason` (cooldown, noise_pattern, duplicate), `customer_id`
+##### `upstream_alert_suppressed_total`
+- **Type:** Counter
+- **Labels:** `product`, `reason`, `customer_id`
+- **Description:** Alerts suppressed due to cooldown or noise patterns
+- **Reasons:** `cooldown`, `duplicate`, `noise_threshold`
 
 #### Drift Detection Metrics
 
-**`upstream_drift_event_detected_total`**
-- Description: Total number of drift events detected across all customers
-- Type: Counter
-- Labels: `product`, `drift_type` (payment_delay, denial_rate, ar_aging), `severity_level` (low, medium, high), `customer_id`
+##### `upstream_drift_event_detected_total`
+- **Type:** Counter
+- **Labels:** `product`, `drift_type`, `severity_level`, `customer_id`
+- **Description:** Total number of payer drift events detected
+- **Drift Types:** `payment_delay`, `denial_rate`, `adjustment_pattern`, `code_mapping_change`
+- **Severity Levels:** `low` (0.0-0.4), `medium` (0.4-0.7), `high` (0.7-1.0)
 
-**`upstream_drift_computation_seconds`**
-- Description: Time spent computing drift detection algorithms
-- Type: Histogram
-- Labels: `product`
-- Buckets: 1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0
+##### `upstream_drift_computation_seconds`
+- **Type:** Histogram
+- **Labels:** `product`
+- **Buckets:** [1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0, +Inf]
+- **Description:** Time spent computing drift signals
+- **Use Case:** Monitor drift detection job performance
 
-**`upstream_payment_delay_signal_total`**
-- Description: Total number of payment delay signals created
-- Type: Counter
-- Labels: `severity` (low, medium, high), `customer_id`
+##### `upstream_payment_delay_signal_total`
+- **Type:** Counter
+- **Labels:** `severity`, `customer_id`
+- **Description:** Payment delay signals created (part of DelayGuard product)
 
-**`upstream_denial_signal_total`**
-- Description: Total number of denial signals created
-- Type: Counter
-- Labels: `signal_type` (rate_change, pattern_shift), `customer_id`
+##### `upstream_denial_signal_total`
+- **Type:** Counter
+- **Labels:** `signal_type`, `customer_id`
+- **Description:** Denial pattern signals created (part of DenialScope product)
 
 #### Data Quality Metrics
 
-**`upstream_data_quality_score`**
-- Description: Current data quality score (0.0-1.0) for each customer
-- Type: Gauge
-- Labels: `customer_id`, `metric_type` (completeness, accuracy, timeliness)
+##### `upstream_data_quality_score`
+- **Type:** Gauge
+- **Labels:** `customer_id`, `metric_type`
+- **Description:** Current data quality score (0.0-1.0)
+- **Metric Types:** `completeness`, `accuracy`, `timeliness`, `consistency`
+- **Use Case:** Real-time data quality monitoring
+- **Example:** `upstream_data_quality_score{customer_id="123",metric_type="completeness"}`
 
-**`upstream_data_quality_check_failed_total`**
-- Description: Total number of failed data quality checks
-- Type: Counter
-- Labels: `check_type` (missing_fields, invalid_values, duplicate_records), `severity` (warning, error, critical), `customer_id`
+##### `upstream_data_quality_check_failed_total`
+- **Type:** Counter
+- **Labels:** `check_type`, `severity`, `customer_id`
+- **Description:** Failed data quality checks
+- **Check Types:** `missing_required_field`, `invalid_format`, `out_of_range`, `referential_integrity`
 
-**`upstream_claim_records_ingested_total`**
-- Description: Total number of claim records ingested from CSV uploads
-- Type: Counter
-- Labels: `customer_id`, `status` (success, failed, partial)
+##### `upstream_claim_records_ingested_total`
+- **Type:** Counter
+- **Labels:** `customer_id`, `status`
+- **Description:** Total number of claim records ingested
+- **Statuses:** `success`, `failed`, `partial`
+- **Use Case:** Monitor ingestion throughput and success rate
 
-**`upstream_ingestion_processing_seconds`**
-- Description: Time spent processing CSV ingestion batches
-- Type: Histogram
-- Labels: `customer_id`
-- Buckets: 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0
+##### `upstream_ingestion_processing_seconds`
+- **Type:** Histogram
+- **Labels:** `customer_id`
+- **Buckets:** [0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, +Inf]
+- **Description:** Time spent processing claim data ingestion batches
 
 #### Background Job Metrics
 
-**`upstream_background_job_started_total`**
-- Description: Total number of Celery background jobs started
-- Type: Counter
-- Labels: `job_type` (drift_detection, report_generation, data_sync), `customer_id`
+##### `upstream_background_job_started_total`
+- **Type:** Counter
+- **Labels:** `job_type`, `customer_id`
+- **Description:** Background jobs started (Celery tasks)
+- **Job Types:** `drift_detection`, `report_generation`, `data_export`, `alert_processing`
 
-**`upstream_background_job_completed_total`**
-- Description: Total number of background jobs completed successfully
-- Type: Counter
-- Labels: `job_type`, `customer_id`
+##### `upstream_background_job_completed_total`
+- **Type:** Counter
+- **Labels:** `job_type`, `customer_id`
+- **Description:** Background jobs completed successfully
 
-**`upstream_background_job_failed_total`**
-- Description: Total number of background jobs that failed
-- Type: Counter
-- Labels: `job_type`, `error_type`, `customer_id`
+##### `upstream_background_job_failed_total`
+- **Type:** Counter
+- **Labels:** `job_type`, `error_type`, `customer_id`
+- **Description:** Background jobs that failed
+- **Use Case:** Monitor Celery task reliability
 
-**`upstream_background_job_duration_seconds`**
-- Description: Duration of background job execution
-- Type: Histogram
-- Labels: `job_type`
-- Buckets: 1.0, 5.0, 30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0
+##### `upstream_background_job_duration_seconds`
+- **Type:** Histogram
+- **Labels:** `job_type`
+- **Buckets:** [1.0, 5.0, 30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, +Inf]
+- **Description:** Duration of background job execution
+- **Use Case:** Track long-running jobs, identify performance issues
 
 #### Report Generation Metrics
 
-**`upstream_report_generated_total`**
-- Description: Total number of reports generated
-- Type: Counter
-- Labels: `report_type` (drift_summary, payer_analysis, ar_aging, quality_report), `customer_id`
+##### `upstream_report_generated_total`
+- **Type:** Counter
+- **Labels:** `report_type`, `customer_id`
+- **Description:** Reports generated successfully
+- **Report Types:** `drift_summary`, `payment_analysis`, `denial_analysis`, `quality_dashboard`
 
-**`upstream_report_generation_seconds`**
-- Description: Time spent generating reports
-- Type: Histogram
-- Labels: `report_type`
-- Buckets: 1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0
+##### `upstream_report_generation_seconds`
+- **Type:** Histogram
+- **Labels:** `report_type`
+- **Buckets:** [1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0, +Inf]
+- **Description:** Time spent generating reports
 
-**`upstream_report_generation_failed_total`**
-- Description: Total number of report generation failures
-- Type: Counter
-- Labels: `report_type`, `error_type`, `customer_id`
+##### `upstream_report_generation_failed_total`
+- **Type:** Counter
+- **Labels:** `report_type`, `error_type`, `customer_id`
+- **Description:** Report generation failures
 
-#### API Metrics
+#### API & Cache Metrics
 
-**`upstream_api_endpoint_calls_total`**
-- Description: Custom tracking of specific API endpoints (supplementing django-prometheus)
-- Type: Counter
-- Labels: `endpoint`, `method`, `customer_id`
+##### `upstream_api_endpoint_calls_total`
+- **Type:** Counter
+- **Labels:** `endpoint`, `method`, `customer_id`
+- **Description:** Custom tracking of specific API endpoints (supplementing django-prometheus)
 
-**`upstream_api_rate_limit_hit_total`**
-- Description: Number of times API rate limits were hit
-- Type: Counter
-- Labels: `endpoint`, `throttle_class`, `customer_id`
+##### `upstream_api_rate_limit_hit_total`
+- **Type:** Counter
+- **Labels:** `endpoint`, `throttle_class`, `customer_id`
+- **Description:** API rate limit violations
+- **Use Case:** Monitor API abuse, adjust rate limits
 
-#### Cache Metrics
+##### `upstream_cache_hit_total`
+- **Type:** Counter
+- **Labels:** `cache_key_prefix`
+- **Description:** Redis cache hits
 
-**`upstream_cache_hit_total`**
-- Description: Total number of cache hits
-- Type: Counter
-- Labels: `cache_key_prefix`
+##### `upstream_cache_miss_total`
+- **Type:** Counter
+- **Labels:** `cache_key_prefix`
+- **Description:** Redis cache misses
+- **Use Case:** Cache effectiveness monitoring, hit rate calculation
 
-**`upstream_cache_miss_total`**
-- Description: Total number of cache misses
-- Type: Counter
-- Labels: `cache_key_prefix`
+### 5. Python & Process Metrics (prometheus_client)
+
+Standard Python runtime metrics:
+
+- `python_gc_objects_collected_total` - Garbage collection statistics
+- `python_gc_collections_total` - GC invocation counts
+- `process_virtual_memory_bytes` - Virtual memory usage
+- `process_resident_memory_bytes` - RSS memory usage
+- `process_cpu_seconds_total` - CPU time consumed
+- `process_open_fds` - Open file descriptors
+- `process_start_time_seconds` - Process start time (Unix timestamp)
 
 ## Example PromQL Queries
 
-### Request Rate Monitoring
+### Request Rate & Errors
 
 ```promql
 # Overall request rate (requests per second)
 rate(django_http_requests_total_by_method_total[5m])
 
 # Request rate by endpoint
-rate(django_http_requests_total_by_view_transport_method[5m])
+rate(django_http_requests_total_by_view_transport_method_total[5m])
 
-# Requests per minute (RPM) by method
-sum(rate(django_http_requests_total_by_method_total[1m])) by (method) * 60
+# Error rate (5xx responses per second)
+rate(django_http_responses_total_by_status_view_method_total{status=~"5.."}[5m])
+
+# Error percentage
+sum(rate(django_http_responses_total_by_status_view_method_total{status=~"5.."}[5m]))
+/
+sum(rate(django_http_responses_total_by_status_view_method_total[5m]))
+* 100
+
+# 4xx client error rate
+rate(django_http_responses_total_by_status_view_method_total{status=~"4.."}[5m])
 ```
 
-### Error Rate Monitoring
+### Latency & Performance
 
 ```promql
-# 5xx error rate
-rate(django_http_responses_total_by_status{status=~"5.."}[5m])
+# P50 (median) latency
+histogram_quantile(0.50, rate(django_http_requests_latency_seconds_bucket[5m]))
 
-# 4xx error rate
-rate(django_http_responses_total_by_status{status=~"4.."}[5m])
+# P95 latency (95th percentile)
+histogram_quantile(0.95, rate(django_http_requests_latency_seconds_bucket[5m]))
 
-# Error percentage (5xx / total)
-sum(rate(django_http_responses_total_by_status{status=~"5.."}[5m]))
+# P99 latency (worst 1% of requests)
+histogram_quantile(0.99, rate(django_http_requests_latency_seconds_bucket[5m]))
+
+# Average request latency
+rate(django_http_requests_latency_seconds_sum[5m])
 /
-sum(rate(django_http_responses_total_by_status[5m])) * 100
-```
+rate(django_http_requests_latency_seconds_count[5m])
 
-### Latency Monitoring
-
-```promql
-# P50 latency by view
-histogram_quantile(0.50, rate(django_http_requests_latency_seconds_by_view_method_bucket[5m]))
-
-# P95 latency by view
-histogram_quantile(0.95, rate(django_http_requests_latency_seconds_by_view_method_bucket[5m]))
-
-# P99 latency by view
-histogram_quantile(0.99, rate(django_http_requests_latency_seconds_by_view_method_bucket[5m]))
-
-# Average latency
-rate(django_http_requests_latency_seconds_by_view_method_sum[5m])
-/
-rate(django_http_requests_latency_seconds_by_view_method_count[5m])
+# Slow endpoint identification (P99 > 2s)
+histogram_quantile(0.99,
+  rate(django_http_requests_latency_seconds_bucket{view=~"upstream.*"}[5m])
+) > 2
 ```
 
 ### Database Performance
 
 ```promql
-# Average query duration by type
-rate(django_db_query_duration_seconds_sum[5m])
+# Database query rate
+rate(django_db_execute_total[5m])
+
+# P99 database query latency
+histogram_quantile(0.99, rate(django_db_query_duration_seconds_bucket[10m]))
+
+# Slow queries (P95 > 100ms)
+histogram_quantile(0.95, rate(django_db_query_duration_seconds_bucket[10m])) > 0.1
+
+# Average queries per request
+rate(django_db_execute_total[5m])
 /
-rate(django_db_query_duration_seconds_count[5m])
-
-# Slow query rate (> 1 second)
-sum(rate(django_db_query_duration_seconds_bucket{le="1.0"}[5m]))
-
-# Query rate by type
-rate(django_db_query_count_total[5m])
+rate(django_http_requests_total_by_method_total[5m])
 ```
 
-### Business Metrics
+### Alert Metrics
 
 ```promql
 # Alert creation rate by severity
-rate(upstream_alert_created_total[1h]) by (severity)
+rate(upstream_alert_created_total[1h])
 
-# Drift detection events by product
-rate(upstream_drift_event_detected_total[1h]) by (product)
+# High-severity alert rate
+rate(upstream_alert_created_total{severity="high"}[1h])
 
-# Data quality score per customer
-upstream_data_quality_score by (customer_id, metric_type)
-
-# Background job success rate
-sum(rate(upstream_background_job_completed_total[5m])) by (job_type)
+# Alert delivery success rate
+sum(rate(upstream_alert_delivered_total[1h]))
 /
-sum(rate(upstream_background_job_started_total[5m])) by (job_type) * 100
+sum(rate(upstream_alert_created_total[1h]))
+* 100
 
-# Report generation P95 latency
-histogram_quantile(0.95, rate(upstream_report_generation_seconds_bucket[5m])) by (report_type)
+# Alert processing latency (P95)
+histogram_quantile(0.95, rate(upstream_alert_processing_seconds_bucket[10m]))
 
+# Failed alert deliveries by channel
+rate(upstream_alert_failed_total[1h])
+```
+
+### Drift Detection
+
+```promql
+# Drift events per hour
+rate(upstream_drift_event_detected_total[1h]) * 3600
+
+# High-severity drift events
+rate(upstream_drift_event_detected_total{severity_level="high"}[1h])
+
+# Drift detection by type
+sum by (drift_type) (rate(upstream_drift_event_detected_total[1h]))
+
+# Drift computation time (P95)
+histogram_quantile(0.95, rate(upstream_drift_computation_seconds_bucket[10m]))
+```
+
+### Data Quality
+
+```promql
+# Current data quality score (by customer)
+upstream_data_quality_score
+
+# Data quality trend (average over 24h)
+avg_over_time(upstream_data_quality_score[24h])
+
+# Ingestion throughput (records per second)
+rate(upstream_claim_records_ingested_total[5m])
+
+# Ingestion success rate
+sum(rate(upstream_claim_records_ingested_total{status="success"}[5m]))
+/
+sum(rate(upstream_claim_records_ingested_total[5m]))
+* 100
+
+# Failed quality checks by type
+sum by (check_type) (rate(upstream_data_quality_check_failed_total[1h]))
+```
+
+### Background Jobs (Celery)
+
+```promql
+# Job execution rate
+rate(upstream_background_job_started_total[5m])
+
+# Job success rate
+sum(rate(upstream_background_job_completed_total[5m]))
+/
+sum(rate(upstream_background_job_started_total[5m]))
+* 100
+
+# Failed jobs by type
+sum by (job_type) (rate(upstream_background_job_failed_total[1h]))
+
+# Job duration (P95)
+histogram_quantile(0.95, rate(upstream_background_job_duration_seconds_bucket[10m]))
+
+# Long-running jobs (>30 minutes)
+histogram_quantile(0.99, rate(upstream_background_job_duration_seconds_bucket[1h])) > 1800
+```
+
+### Cache Performance
+
+```promql
 # Cache hit rate
 sum(rate(upstream_cache_hit_total[5m]))
 /
-(sum(rate(upstream_cache_hit_total[5m])) + sum(rate(upstream_cache_miss_total[5m]))) * 100
+sum(rate(upstream_cache_hit_total[5m]) + rate(upstream_cache_miss_total[5m]))
+* 100
+
+# Cache effectiveness by key prefix
+sum by (cache_key_prefix) (
+  rate(upstream_cache_hit_total[5m])
+  /
+  (rate(upstream_cache_hit_total[5m]) + rate(upstream_cache_miss_total[5m]))
+)
 ```
 
-## Grafana Dashboard Recommendations
+### Resource Utilization
 
-### Dashboard 1: Application Health
+```promql
+# Memory usage (MB)
+process_resident_memory_bytes / 1024 / 1024
 
-**Panels:**
-1. Request Rate (RPM) - Time series graph
-2. Error Rate (%) - Time series graph with alerting threshold
-3. P95 Latency - Time series graph by endpoint
-4. Active Database Connections - Gauge
-5. Error Count by Status Code - Bar chart
-6. Top 10 Slowest Endpoints - Table
+# CPU usage
+rate(process_cpu_seconds_total[1m])
 
-### Dashboard 2: Business Operations
+# Open file descriptors
+process_open_fds
 
-**Panels:**
-1. Alert Creation Rate - Time series by product and severity
-2. Drift Events Detected - Counter with rate calculation
-3. Data Quality Scores - Gauge per customer
-4. Background Job Success Rate - Stat panel with sparkline
-5. Report Generation Latency - Heatmap
-6. Claims Ingested (24h) - Counter with daily rate
-
-### Dashboard 3: Database Performance
-
-**Panels:**
-1. Query Duration P95 - Time series by query type
-2. Query Rate - Time series by operation (SELECT/INSERT/UPDATE/DELETE)
-3. Slow Queries (>1s) - Counter with rate
-4. Database Connection Pool - Time series (active vs total)
-5. Model Operations - Stacked area chart
-
-### Dashboard 4: Customer Insights
-
-**Panels:**
-1. Alerts per Customer - Bar chart (top 10)
-2. Data Quality by Customer - Table
-3. API Usage per Customer - Time series
-4. Drift Events per Customer - Heatmap
-5. Background Jobs per Customer - Time series
+# File descriptor usage percentage
+(process_open_fds / process_max_fds) * 100
+```
 
 ## Alerting Rules
 
-Example Prometheus alerting rules for production monitoring:
+Example Prometheus alerting rules for critical conditions:
 
 ```yaml
 groups:
-  - name: upstream_critical
+  - name: upstream_api
     interval: 30s
     rules:
       # High error rate
       - alert: HighErrorRate
         expr: |
-          sum(rate(django_http_responses_total_by_status{status=~"5.."}[5m]))
+          sum(rate(django_http_responses_total_by_status_view_method_total{status=~"5.."}[5m]))
           /
-          sum(rate(django_http_responses_total_by_status[5m])) > 0.05
+          sum(rate(django_http_responses_total_by_status_view_method_total[5m]))
+          * 100 > 5
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "High 5xx error rate detected"
-          description: "Error rate is {{ $value | humanizePercentage }}"
+          summary: "High API error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
 
-      # High P95 latency
+      # High latency
       - alert: HighLatency
         expr: |
           histogram_quantile(0.95,
-            rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])
-          ) > 2.0
+            rate(django_http_requests_latency_seconds_bucket[5m])
+          ) > 2
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "High P95 latency detected"
-          description: "P95 latency is {{ $value }}s for {{ $labels.view }}"
+          summary: "API latency is high"
+          description: "P95 latency is {{ $value }}s (threshold: 2s)"
 
-      # Slow database queries
+      # Database slow queries
       - alert: SlowDatabaseQueries
         expr: |
           histogram_quantile(0.95,
-            rate(django_db_query_duration_seconds_bucket[5m])
-          ) > 1.0
+            rate(django_db_query_duration_seconds_bucket[10m])
+          ) > 0.5
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Slow database queries detected"
-          description: "P95 query duration is {{ $value }}s"
+          summary: "Database queries are slow"
+          description: "P95 query duration is {{ $value }}s (threshold: 500ms)"
+
+      # Alert delivery failures
+      - alert: AlertDeliveryFailures
+        expr: |
+          sum(rate(upstream_alert_failed_total[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alert delivery failures detected"
+          description: "{{ $value }} alert delivery failures per second"
+
+      # Data quality degradation
+      - alert: DataQualityDegraded
+        expr: |
+          upstream_data_quality_score < 0.8
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data quality score below threshold"
+          description: "Quality score: {{ $value }} (threshold: 0.8)"
 
       # Background job failures
       - alert: BackgroundJobFailures
         expr: |
-          sum(rate(upstream_background_job_failed_total[15m])) by (job_type) > 0.1
-        for: 15m
+          sum(rate(upstream_background_job_failed_total[5m])) > 0.05
+        for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Background job failures detected"
-          description: "{{ $labels.job_type }} failing at {{ $value }} jobs/sec"
+          description: "{{ $value }} job failures per second"
 
-      # Low data quality score
-      - alert: LowDataQuality
+      # Memory usage high
+      - alert: HighMemoryUsage
         expr: |
-          upstream_data_quality_score < 0.7
-        for: 1h
+          process_resident_memory_bytes / 1024 / 1024 / 1024 > 2
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Low data quality score"
-          description: "Customer {{ $labels.customer_id }} quality score is {{ $value }}"
-
-      # Cache degradation
-      - alert: LowCacheHitRate
-        expr: |
-          sum(rate(upstream_cache_hit_total[10m]))
-          /
-          (sum(rate(upstream_cache_hit_total[10m])) + sum(rate(upstream_cache_miss_total[10m])))
-          < 0.5
-        for: 15m
-        labels:
-          severity: info
-        annotations:
-          summary: "Cache hit rate below 50%"
-          description: "Cache hit rate is {{ $value | humanizePercentage }}"
+          summary: "High memory usage"
+          description: "Process using {{ $value }}GB of memory"
 ```
+
+## Grafana Dashboard Recommendations
+
+### Dashboard 1: API Overview
+- Request rate (QPS)
+- Error rate (5xx, 4xx)
+- Latency percentiles (P50, P95, P99)
+- Top endpoints by traffic
+- Top endpoints by latency
+- Top endpoints by errors
+
+### Dashboard 2: Database Performance
+- Query rate
+- Query latency distribution
+- Slow query identification
+- Queries per request
+- Connection pool usage
+- Model operation rates (inserts/updates/deletes)
+
+### Dashboard 3: Business Metrics
+- Alert creation rate by product
+- Alert delivery success rate
+- Drift event detection rate
+- Data quality scores
+- Ingestion throughput
+- Report generation rates
+
+### Dashboard 4: Background Jobs
+- Job execution rate by type
+- Job success rate
+- Job duration trends
+- Failed job breakdown
+- Queue depth (if using Celery monitoring)
+
+### Dashboard 5: System Resources
+- Memory usage trend
+- CPU utilization
+- File descriptor usage
+- Garbage collection frequency
+- Python interpreter metrics
+
+## Instrumentation Code Examples
+
+### Tracking Alert Creation
+
+```python
+from upstream.metrics import track_alert_created
+
+# In alert creation logic
+track_alert_created(
+    product='DriftWatch',
+    severity='high',
+    customer_id=customer.id
+)
+```
+
+### Tracking Drift Events
+
+```python
+from upstream.metrics import track_drift_event
+
+# In drift detection logic
+track_drift_event(
+    product='DriftWatch',
+    drift_type='payment_delay',
+    severity=0.85,  # Will be categorized as 'high'
+    customer_id=customer.id
+)
+```
+
+### Tracking Data Quality
+
+```python
+from upstream.metrics import track_data_quality_score
+
+# After data quality checks
+track_data_quality_score(
+    customer_id=customer.id,
+    metric_type='completeness',
+    score=0.94
+)
+```
+
+### Timing Operations
+
+```python
+from upstream.metrics import alert_processing_time
+
+# Time alert processing
+with alert_processing_time.labels(product='DriftWatch').time():
+    process_and_send_alert(alert)
+```
+
+### Tracking Ingestion
+
+```python
+from upstream.metrics import track_ingestion
+
+# After claim data ingestion
+track_ingestion(
+    customer_id=customer.id,
+    record_count=1500,
+    status='success'
+)
+```
+
+## Production Deployment Checklist
+
+- [ ] Prometheus server configured to scrape `/metrics` endpoint
+- [ ] Firewall rules restrict `/metrics` access to Prometheus server only
+- [ ] Alerting rules configured in Prometheus for critical conditions
+- [ ] Grafana dashboards created for visualization
+- [ ] Alert notification channels configured (PagerDuty, Slack, email)
+- [ ] Metric retention policy configured (recommend 30+ days for trends)
+- [ ] High-cardinality labels avoided (don't use unbounded dimensions like request ID)
+- [ ] Custom business metrics instrumented in application code
+- [ ] Monitoring infrastructure health checks validated
+
+## Troubleshooting
+
+### Metrics Endpoint Returns 404
+- Verify `django_prometheus.urls` is included in `urlpatterns`
+- Check that django-prometheus is in `INSTALLED_APPS`
+- Ensure middleware is correctly configured
+
+### Missing Custom Metrics
+- Verify `upstream.metrics` module is importable
+- Check that metrics are registered at module load time
+- Ensure instrumentation code is being executed
+
+### High Cardinality Warnings
+- Avoid using unbounded labels (IDs, timestamps, email addresses)
+- Use label values with known, limited set of values
+- Consider aggregating high-cardinality data before exporting
+
+### Metrics Endpoint Slow to Respond
+- Reduce scrape frequency (increase `scrape_interval`)
+- Use federation to reduce load on application servers
+- Consider using prometheus-aggregator for high-traffic deployments
 
 ## Security Considerations
 
@@ -501,49 +729,10 @@ groups:
 4. **Customer Isolation**: Customer data is separated via `customer_id` labels only
 5. **Rate Limiting**: Consider adding rate limiting if exposed to public networks
 
-## Troubleshooting
-
-### Metrics Not Appearing
-
-1. Verify django-prometheus is installed:
-   ```bash
-   pip show django-prometheus
-   ```
-
-2. Check middleware configuration:
-   ```python
-   python manage.py shell -c "from django.conf import settings; print([m for m in settings.MIDDLEWARE if 'prometheus' in m.lower()])"
-   ```
-
-3. Verify endpoint is accessible:
-   ```bash
-   curl http://localhost:8000/metrics
-   ```
-
-### Custom Metrics Not Incrementing
-
-1. Check metric is imported and called:
-   ```python
-   from upstream.metrics import track_alert_created
-   track_alert_created('DriftWatch', 'high', customer_id=1)
-   ```
-
-2. Verify no exceptions in logs:
-   ```bash
-   grep "Failed to track.*metric" logs/app.log
-   ```
-
-### High Memory Usage
-
-Django-prometheus stores metrics in memory. For high-traffic applications:
-
-1. Use shorter scrape intervals (15s recommended)
-2. Limit label cardinality (avoid unique identifiers as labels)
-3. Monitor memory usage with process metrics
-
 ## References
 
-- [django-prometheus Documentation](https://github.com/korfuri/django-prometheus)
-- [Prometheus Exposition Formats](https://prometheus.io/docs/instrumenting/exposition_formats/)
-- [PromQL Query Language](https://prometheus.io/docs/prometheus/latest/querying/basics/)
-- [Grafana Dashboard Best Practices](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/best-practices/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [django-prometheus GitHub](https://github.com/korfuri/django-prometheus)
+- [Prometheus Exposition Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
+- [PromQL Documentation](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+- [Grafana Dashboard Best Practices](https://grafana.com/docs/grafana/latest/dashboards/)

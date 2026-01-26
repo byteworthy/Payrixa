@@ -101,193 +101,211 @@ def get_logging_config(
                 "()": "upstream.logging_utils.StructuredLogFormatter",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
+            "json_structured": {
+                "()": "upstream.logging_utils.JSONLogFormatter",
+                "format": "%(timestamp)s %(level)s %(name)s %(message)s",
+            },
             "audit": {
                 "format": "{asctime} | {levelname} | {name} | {message}",
                 "style": "{",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
-        # =============================================================================
-        # HANDLERS: File Rotation and Console Output
-        # =============================================================================
-        "handlers": {
-            # Console handler (stdout) - for all logs
-            "console": {
-                "class": "logging.StreamHandler",
-                "level": log_level,
-                "formatter": "structured",
-                "filters": ["phi_scrubber"],
-            },
-            # General application logs (INFO and above)
-            # Rotates daily at midnight, keeps 30 days
-            "app_file": {
-                "class": "logging.handlers.TimedRotatingFileHandler",
-                "filename": str(log_dir / "app.log"),
-                "when": "midnight",
-                "interval": 1,
-                "backupCount": get_log_retention_days("INFO"),
-                "formatter": "structured",
-                "filters": ["phi_scrubber"],
-                "level": "INFO",
-                "encoding": "utf-8",
-            },
-            # Error logs (WARNING and above)
-            # Rotates daily, keeps 90 days
-            "error_file": {
-                "class": "logging.handlers.TimedRotatingFileHandler",
-                "filename": str(log_dir / "error.log"),
-                "when": "midnight",
-                "interval": 1,
-                "backupCount": get_log_retention_days("ERROR"),
-                "formatter": "structured",
-                "filters": ["phi_scrubber"],
-                "level": "WARNING",
-                "encoding": "utf-8",
-            },
-            # Audit logs (HIPAA compliance - 7 year retention required)
-            # Rotates daily, keeps 2555 days (7 years)
-            # Note: In production, use log aggregation service for long-term storage
-            "audit_file": {
-                "class": "logging.handlers.TimedRotatingFileHandler",
-                "filename": str(log_dir / "audit.log"),
-                "when": "midnight",
-                "interval": 1,
-                "backupCount": 2555,  # 7 years for HIPAA compliance
-                "formatter": "audit",
-                "filters": ["phi_scrubber"],
-                "level": "INFO",
-                "encoding": "utf-8",
-            },
-            # Security logs (authentication, authorization, access control)
-            # Rotates daily, keeps 90 days
-            "security_file": {
-                "class": "logging.handlers.TimedRotatingFileHandler",
-                "filename": str(log_dir / "security.log"),
-                "when": "midnight",
-                "interval": 1,
-                "backupCount": get_log_retention_days("WARNING"),
-                "formatter": "structured",
-                "filters": ["phi_scrubber"],
-                "level": "INFO",
-                "encoding": "utf-8",
-            },
-            # Performance logs (slow queries, high latency, etc.)
-            # Rotates daily, keeps 30 days
-            "performance_file": {
-                "class": "logging.handlers.TimedRotatingFileHandler",
-                "filename": str(log_dir / "performance.log"),
-                "when": "midnight",
-                "interval": 1,
-                "backupCount": get_log_retention_days("INFO"),
-                "formatter": "structured",
-                "filters": ["phi_scrubber"],
-                "level": "INFO",
-                "encoding": "utf-8",
-            },
+    }
+
+    # Determine formatter based on environment
+    # Production: JSON for machine parsing (CloudWatch, Datadog, ELK)
+    # Development/Test: Structured key=value for human readability
+    if environment == "production":
+        formatter_name = "json_structured"
+    else:
+        formatter_name = "structured"
+
+    # Audit logs use JSON in all environments (machine-readable)
+    audit_formatter = "json_structured"
+
+    # =============================================================================
+    # HANDLERS: File Rotation and Console Output
+    # =============================================================================
+    config["handlers"] = {
+        # Console handler (stdout) - for all logs
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": log_level,
+            "formatter": formatter_name,
+            "filters": ["phi_scrubber"],
         },
-        # =============================================================================
-        # LOGGERS: Application and Third-Party
-        # =============================================================================
-        "loggers": {
-            # Django core logs
-            "django": {
-                "handlers": ["console", "app_file", "error_file"],
-                "level": log_level,
-                "propagate": False,
-            },
-            # Django request logs (includes middleware, views, etc.)
-            "django.request": {
-                "handlers": ["console", "error_file", "security_file"],
-                "level": "WARNING",  # Log failed requests
-                "propagate": False,
-            },
-            # Django database queries
-            "django.db.backends": {
-                "handlers": ["console"] if environment == "development" else [],
-                "level": "DEBUG" if environment == "development" else "INFO",
-                "propagate": False,
-            },
-            # Django security logs
-            "django.security": {
-                "handlers": ["console", "security_file"],
-                "level": "WARNING",
-                "propagate": False,
-            },
-            # Upstream application logs
-            "upstream": {
-                "handlers": ["console", "app_file", "error_file"],
-                "level": log_level,
-                "propagate": False,
-            },
-            # Upstream services (drift detection, alerts, etc.)
-            "upstream.services": {
-                "handlers": ["console", "app_file", "error_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            # Upstream tasks (Celery background jobs)
-            "upstream.tasks": {
-                "handlers": ["console", "app_file", "error_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            # Audit logging (HIPAA compliance)
-            "auditlog": {
-                "handlers": ["console", "audit_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            # Authentication and authorization
-            "upstream.authentication": {
-                "handlers": ["console", "security_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "upstream.permissions": {
-                "handlers": ["console", "security_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            # Performance monitoring
-            "upstream.performance": {
-                "handlers": ["console", "performance_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            # Third-party libraries (reduce noise)
-            "celery": {
-                "handlers": ["console", "app_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "gunicorn": {
-                "handlers": ["console", "app_file"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "urllib3": {
-                "handlers": ["console"],
-                "level": "WARNING",  # Reduce noise from HTTP requests
-                "propagate": False,
-            },
-            "boto3": {
-                "handlers": ["console"],
-                "level": "WARNING",  # Reduce noise from AWS SDK
-                "propagate": False,
-            },
-            "botocore": {
-                "handlers": ["console"],
-                "level": "WARNING",
-                "propagate": False,
-            },
+        # General application logs (INFO and above)
+        # Rotates daily at midnight, keeps 30 days
+        "app_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(log_dir / "app.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": get_log_retention_days("INFO"),
+            "formatter": formatter_name,
+            "filters": ["phi_scrubber"],
+            "level": "INFO",
+            "encoding": "utf-8",
         },
-        # =============================================================================
-        # ROOT LOGGER: Catch-all for unconfigured loggers
-        # =============================================================================
-        "root": {
+        # Error logs (WARNING and above)
+        # Rotates daily, keeps 90 days
+        "error_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(log_dir / "error.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": get_log_retention_days("ERROR"),
+            "formatter": formatter_name,
+            "filters": ["phi_scrubber"],
+            "level": "WARNING",
+            "encoding": "utf-8",
+        },
+        # Audit logs (HIPAA compliance - 7 year retention required)
+        # Rotates daily, keeps 2555 days (7 years)
+        # Note: In production, use log aggregation service for long-term storage
+        "audit_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(log_dir / "audit.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 2555,  # 7 years for HIPAA compliance
+            "formatter": audit_formatter,
+            "filters": ["phi_scrubber"],
+            "level": "INFO",
+            "encoding": "utf-8",
+        },
+        # Security logs (authentication, authorization, access control)
+        # Rotates daily, keeps 90 days
+        "security_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(log_dir / "security.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": get_log_retention_days("WARNING"),
+            "formatter": formatter_name,
+            "filters": ["phi_scrubber"],
+            "level": "INFO",
+            "encoding": "utf-8",
+        },
+        # Performance logs (slow queries, high latency, etc.)
+        # Rotates daily, keeps 30 days
+        "performance_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(log_dir / "performance.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": get_log_retention_days("INFO"),
+            "formatter": formatter_name,
+            "filters": ["phi_scrubber"],
+            "level": "INFO",
+            "encoding": "utf-8",
+        },
+    }
+
+    # =============================================================================
+    # LOGGERS: Application and Third-Party
+    # =============================================================================
+    config["loggers"] = {
+        # Django core logs
+        "django": {
             "handlers": ["console", "app_file", "error_file"],
             "level": log_level,
+            "propagate": False,
         },
+        # Django request logs (includes middleware, views, etc.)
+        "django.request": {
+            "handlers": ["console", "error_file", "security_file"],
+            "level": "WARNING",  # Log failed requests
+            "propagate": False,
+        },
+        # Django database queries
+        "django.db.backends": {
+            "handlers": ["console"] if environment == "development" else [],
+            "level": "DEBUG" if environment == "development" else "INFO",
+            "propagate": False,
+        },
+        # Django security logs
+        "django.security": {
+            "handlers": ["console", "security_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # Upstream application logs
+        "upstream": {
+            "handlers": ["console", "app_file", "error_file"],
+            "level": log_level,
+            "propagate": False,
+        },
+        # Upstream services (drift detection, alerts, etc.)
+        "upstream.services": {
+            "handlers": ["console", "app_file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Upstream tasks (Celery background jobs)
+        "upstream.tasks": {
+            "handlers": ["console", "app_file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Audit logging (HIPAA compliance)
+        "auditlog": {
+            "handlers": ["console", "audit_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Authentication and authorization
+        "upstream.authentication": {
+            "handlers": ["console", "security_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "upstream.permissions": {
+            "handlers": ["console", "security_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Performance monitoring
+        "upstream.performance": {
+            "handlers": ["console", "performance_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Third-party libraries (reduce noise)
+        "celery": {
+            "handlers": ["console", "app_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "gunicorn": {
+            "handlers": ["console", "app_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "urllib3": {
+            "handlers": ["console"],
+            "level": "WARNING",  # Reduce noise from HTTP requests
+            "propagate": False,
+        },
+        "boto3": {
+            "handlers": ["console"],
+            "level": "WARNING",  # Reduce noise from AWS SDK
+            "propagate": False,
+        },
+        "botocore": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    }
+
+    # =============================================================================
+    # ROOT LOGGER: Catch-all for unconfigured loggers
+    # =============================================================================
+    config["root"] = {
+        "handlers": ["console", "app_file", "error_file"],
+        "level": log_level,
     }
 
     # Development-specific: Add debug handler
