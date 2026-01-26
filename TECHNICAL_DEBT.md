@@ -207,18 +207,49 @@ related_aggs = DenialAggregate.objects.filter(
 
 ---
 
-### CRIT-6: DelayGuard Computation Memory Intensive
+### ~~CRIT-6: DelayGuard Computation Memory Intensive~~ ✅ RESOLVED
 **Domain**: Performance
-**File**: upstream/products/delayguard/services.py:376-448
+**File**: upstream/products/delayguard/services.py:350-447
 **Impact**: 100MB+ memory usage for 90-day window
 **Effort**: Medium
+**Status**: ✅ Fixed on 2026-01-26
 
 **Description**: Builds entire dictionary of daily payment data in memory before aggregation.
 
-**Fix**: Use iterator pattern or batch processing:
+**Fix Applied**:
 ```python
-days_qs.iterator(chunk_size=1000)
+# Combined two separate queries into one with filtered aggregations
+# Before: Two queries - aggregates_qs and days_qs, then built dictionary
+# After: Single query with all metrics using filter parameter in annotate
+
+aggregates_qs = base_qs.values(
+    'submitted_date',
+    'payer',
+).annotate(
+    # Row counts for all claims
+    total_rows=Count('id'),
+    valid_rows=Count('id', filter=~(
+        models.Q(submitted_date__isnull=True) |
+        models.Q(decided_date__isnull=True)
+    )),
+    # Days-to-payment metrics with filter
+    claim_count=Count('id', filter=~(...)),
+    total_days=Sum(F('decided_date') - F('submitted_date'), filter=~(...)),
+    min_days=Min(F('decided_date') - F('submitted_date'), filter=~(...)),
+    max_days=Max(F('decided_date') - F('submitted_date'), filter=~(...)),
+    # ... other aggregations with filters
+)
+# No longer builds days_data dictionary in memory
 ```
+
+**Resolution**:
+- Eliminated separate `days_qs` query and in-memory dictionary build
+- Combined both queries into single aggregation with filter parameters
+- Removed `days_data` dictionary that loaded thousands of rows into memory
+- All metrics now computed in database and returned in single result set
+- **Expected Performance**: 100MB+ memory savings for 90-day windows
+- **Impact**: Prevents OOM issues on large datasets, faster computation
+- **Note**: No existing tests for DelayGuard (covered by CRIT-7)
 
 ---
 
@@ -598,22 +629,22 @@ Run: `python manage.py migrate token_blacklist`
 
 ## Progress Tracking
 
-**Current Status**: Phase 1 - In Progress (6/10 Critical Issues Resolved - 60%)
+**Current Status**: Phase 1 - In Progress (7/10 Critical Issues Resolved - 70%)
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 125 | 95.4% |
+| To Do | 124 | 94.7% |
 | In Progress | 0 | 0% |
-| Done | 6 | 4.6% |
+| Done | 7 | 5.3% |
 
 ### By Domain Completion
 
 | Domain | Issues | Fixed | % Complete |
 |--------|--------|-------|------------|
 | Security | 10 | 0 | 0% |
-| Performance | 18 | 2 | 11.1% |
+| Performance | 18 | 3 | 16.7% |
 | Testing | 17 | 0 | 0% |
 | Architecture | 21 | 0 | 0% |
 | Database | 22 | 1 | 4.5% |
@@ -626,6 +657,7 @@ Run: `python manage.py migrate token_blacklist`
 - ✅ **CRIT-3**: TextField to CharField with indexes for payer/CPT (upstream/models.py)
 - ✅ **CRIT-4**: N+1 query in drift computation (upstream/services/payer_drift.py)
 - ✅ **CRIT-5**: DenialScope Python iteration to DB aggregation (upstream/products/denialscope/services.py)
+- ✅ **CRIT-6**: DelayGuard memory-intensive computation (upstream/products/delayguard/services.py)
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 
 ---
