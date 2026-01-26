@@ -62,7 +62,18 @@ steps:
     secretEnv:
       - 'SECRET_KEY'
 
-  # Step 5: Deploy to Cloud Run
+  # Step 5: Create database backup before deployment (CRIT-1)
+  # Ensures data recovery path exists if migration fails or causes corruption
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'sql'
+      - 'backups'
+      - 'create'
+      - '--instance=${_DB_INSTANCE}'
+      - '--project=$PROJECT_ID'
+
+  # Step 6: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -92,6 +103,9 @@ steps:
       - 'SECRET_KEY=django-secret-key:latest,DATABASE_URL=database-url:latest,REDIS_URL=redis-url:latest'
 
 timeout: 1800s
+
+substitutions:
+  _DB_INSTANCE: 'upstream-prod'  # Default database instance for backups
 
 availableSecrets:
   secretManager:

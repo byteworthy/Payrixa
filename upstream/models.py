@@ -1,8 +1,8 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.utils import timezone
 from django.conf import settings
 from upstream.core.tenant import CustomerScopedManager
+
 
 class Customer(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -10,8 +10,11 @@ class Customer(models.Model):
     def __str__(self):
         return self.name
 
+
 class Settings(models.Model):
-    customer = models.OneToOneField(Customer, on_delete=models.CASCADE, related_name='settings')
+    customer = models.OneToOneField(
+        Customer, on_delete=models.CASCADE, related_name="settings"
+    )
     to_email = models.EmailField()
     cc_email = models.EmailField(blank=True, null=True)
     attach_pdf = models.BooleanField(default=True)
@@ -23,18 +26,23 @@ class Settings(models.Model):
     def __str__(self):
         return f"Settings for {self.customer.name}"
 
+
 class Upload(models.Model):
     STATUS_CHOICES = [
-        ('processing', 'Processing'),
-        ('success', 'Success'),
-        ('failed', 'Failed'),
-        ('partial', 'Partial Success'),
+        ("processing", "Processing"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("partial", "Partial Success"),
     ]
 
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='uploads')
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="uploads"
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     filename = models.CharField(max_length=255)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="processing"
+    )
     error_message = models.TextField(blank=True, null=True)
     row_count = models.IntegerField(blank=True, null=True)
     date_min = models.DateField(blank=True, null=True)
@@ -43,50 +51,52 @@ class Upload(models.Model):
     # Processing metadata (additive)
     processing_started_at = models.DateTimeField(blank=True, null=True)
     processing_completed_at = models.DateTimeField(blank=True, null=True)
-    processing_duration_seconds = models.IntegerField(blank=True, null=True,
-                                                      help_text='Time taken to process upload')
+    processing_duration_seconds = models.IntegerField(
+        blank=True, null=True, help_text="Time taken to process upload"
+    )
 
     # Quality tracking (additive)
-    accepted_row_count = models.IntegerField(default=0,
-                                            help_text='Number of rows that passed validation')
-    rejected_row_count = models.IntegerField(default=0,
-                                            help_text='Number of rows that failed validation')
-    warning_row_count = models.IntegerField(default=0,
-                                           help_text='Number of rows with warnings')
+    accepted_row_count = models.IntegerField(
+        default=0, help_text="Number of rows that passed validation"
+    )
+    rejected_row_count = models.IntegerField(
+        default=0, help_text="Number of rows that failed validation"
+    )
+    warning_row_count = models.IntegerField(
+        default=0, help_text="Number of rows with warnings"
+    )
 
     # File metadata
     file_size_bytes = models.BigIntegerField(blank=True, null=True)
-    file_hash = models.CharField(max_length=64, blank=True, null=True,
-                                help_text='SHA-256 hash for deduplication')
-    file_encoding = models.CharField(max_length=50, blank=True, null=True,
-                                    default='utf-8')
+    file_hash = models.CharField(
+        max_length=64, blank=True, null=True, help_text="SHA-256 hash for deduplication"
+    )
+    file_encoding = models.CharField(
+        max_length=50, blank=True, null=True, default="utf-8"
+    )
 
     # Upload context
     uploaded_by = models.ForeignKey(
-        'auth.User',
+        "auth.User",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='uploads',
-        help_text='User who uploaded this file'
+        related_name="uploads",
+        help_text="User who uploaded this file",
     )
     upload_source = models.CharField(
         max_length=50,
-        default='web_ui',
-        choices=[('web_ui', 'Web UI'), ('api', 'API'), ('batch', 'Batch Process')],
-        help_text='How this file was uploaded'
+        default="web_ui",
+        choices=[("web_ui", "Web UI"), ("api", "API"), ("batch", "Batch Process")],
+        help_text="How this file was uploaded",
     )
 
     # Validation summary
     validation_errors = models.JSONField(
-        default=list,
-        blank=True,
-        help_text='Summary of validation errors by type'
+        default=list, blank=True, help_text="Summary of validation errors by type"
     )
     data_quality_issues = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text='Summary of data quality issues found'
+        default=dict, blank=True, help_text="Summary of data quality issues found"
     )
 
     # Tenant isolation
@@ -96,7 +106,7 @@ class Upload(models.Model):
     @property
     def quality_score(self):
         """Calculate data quality score (0.0 to 1.0)."""
-        if not hasattr(self, 'quality_report') or not self.quality_report:
+        if not hasattr(self, "quality_report") or not self.quality_report:
             # Fallback to basic calculation
             if self.row_count and self.row_count > 0:
                 return self.accepted_row_count / self.row_count
@@ -117,9 +127,11 @@ class Upload(models.Model):
     @property
     def has_quality_issues(self):
         """Check if upload has any quality issues."""
-        return (self.rejected_row_count > 0 or
-                self.warning_row_count > 0 or
-                len(self.data_quality_issues or {}) > 0)
+        return (
+            self.rejected_row_count > 0
+            or self.warning_row_count > 0
+            or len(self.data_quality_issues or {}) > 0
+        )
 
     @property
     def processing_speed(self):
@@ -140,42 +152,46 @@ class DataQualityReport(models.Model):
     Enables "Trust before scale" principle by showing operators
     exactly what data passed validation.
     """
-    upload = models.OneToOneField(Upload, on_delete=models.CASCADE, related_name='quality_report')
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='quality_reports')
+
+    upload = models.OneToOneField(
+        Upload, on_delete=models.CASCADE, related_name="quality_report"
+    )
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="quality_reports"
+    )
 
     # Summary metrics
-    total_rows = models.IntegerField(default=0, help_text='Total rows in CSV file')
-    accepted_rows = models.IntegerField(default=0, help_text='Rows that passed validation')
-    rejected_rows = models.IntegerField(default=0, help_text='Rows that failed validation')
+    total_rows = models.IntegerField(default=0, help_text="Total rows in CSV file")
+    accepted_rows = models.IntegerField(
+        default=0, help_text="Rows that passed validation"
+    )
+    rejected_rows = models.IntegerField(
+        default=0, help_text="Rows that failed validation"
+    )
 
     # Detailed rejection tracking
     rejection_details = models.JSONField(
         default=dict,
-        help_text='Map of row numbers to rejection reasons: {row_num: reason}'
+        help_text="Map of row numbers to rejection reasons: {row_num: reason}",
     )
 
     # Validation warnings (non-fatal)
     warnings = models.JSONField(
-        default=list,
-        help_text='List of warning messages: [{row: int, message: str}]'
+        default=list, help_text="List of warning messages: [{row: int, message: str}]"
     )
 
     # Quality metrics
     phi_detections = models.IntegerField(
-        default=0,
-        help_text='Number of rows rejected for potential PHI'
+        default=0, help_text="Number of rows rejected for potential PHI"
     )
     missing_fields = models.IntegerField(
-        default=0,
-        help_text='Number of rows rejected for missing required fields'
+        default=0, help_text="Number of rows rejected for missing required fields"
     )
     invalid_dates = models.IntegerField(
-        default=0,
-        help_text='Number of rows rejected for invalid date formats'
+        default=0, help_text="Number of rows rejected for invalid date formats"
     )
     invalid_values = models.IntegerField(
-        default=0,
-        help_text='Number of rows rejected for invalid field values'
+        default=0, help_text="Number of rows rejected for invalid field values"
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -186,12 +202,16 @@ class DataQualityReport(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['customer', '-created_at'], name='dqr_cust_created_idx'),
-            models.Index(fields=['upload'], name='dqr_upload_idx'),
+            models.Index(
+                fields=["customer", "-created_at"], name="dqr_cust_created_idx"
+            ),
+            models.Index(fields=["upload"], name="dqr_upload_idx"),
         ]
 
     def __str__(self):
-        quality_pct = (self.accepted_rows / self.total_rows * 100) if self.total_rows > 0 else 0
+        quality_pct = (
+            (self.accepted_rows / self.total_rows * 100) if self.total_rows > 0 else 0
+        )
         return f"Quality Report: {self.upload.filename} ({quality_pct:.1f}% accepted)"
 
     @property
@@ -210,72 +230,107 @@ class DataQualityReport(models.Model):
         """Get human-readable summary of rejection reasons."""
         summary = {}
         if self.phi_detections > 0:
-            summary['PHI detected'] = self.phi_detections
+            summary["PHI detected"] = self.phi_detections
         if self.missing_fields > 0:
-            summary['Missing required fields'] = self.missing_fields
+            summary["Missing required fields"] = self.missing_fields
         if self.invalid_dates > 0:
-            summary['Invalid dates'] = self.invalid_dates
+            summary["Invalid dates"] = self.invalid_dates
         if self.invalid_values > 0:
-            summary['Invalid values'] = self.invalid_values
+            summary["Invalid values"] = self.invalid_values
         return summary
+
 
 class ClaimRecord(models.Model):
     OUTCOME_CHOICES = [
-        ('PAID', 'Paid'),
-        ('DENIED', 'Denied'),
-        ('OTHER', 'Other'),
+        ("PAID", "Paid"),
+        ("DENIED", "Denied"),
+        ("OTHER", "Other"),
     ]
 
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='claim_records')
-    upload = models.ForeignKey(Upload, on_delete=models.CASCADE, related_name='claim_records')
-    payer = models.TextField()
-    cpt = models.TextField()
-    cpt_group = models.TextField(default="OTHER")
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="claim_records"
+    )
+    upload = models.ForeignKey(
+        Upload, on_delete=models.CASCADE, related_name="claim_records"
+    )
+    # CRIT-3: Changed from TextField to CharField with indexes for query performance
+    payer = models.CharField(
+        max_length=255, db_index=True, help_text="Insurance payer name"
+    )
+    cpt = models.CharField(max_length=20, db_index=True, help_text="CPT procedure code")
+    cpt_group = models.CharField(
+        max_length=50,
+        db_index=True,
+        default="OTHER",
+        help_text="CPT code group for analytics",
+    )
     submitted_date = models.DateField()
     decided_date = models.DateField()
     outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES)
-    allowed_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    allowed_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, blank=True, null=True
+    )
 
     # DenialScope fields - additive for Sprint 2
-    denial_reason_code = models.CharField(max_length=50, blank=True, null=True,
-                                         help_text='Denial reason code from payer')
-    denial_reason_text = models.TextField(blank=True, null=True,
-                                         help_text='Denial reason description')
+    denial_reason_code = models.CharField(
+        max_length=50, blank=True, null=True, help_text="Denial reason code from payer"
+    )
+    denial_reason_text = models.TextField(
+        blank=True, null=True, help_text="Denial reason description"
+    )
 
     # Advanced analytics fields (additive)
-    billed_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True,
-                                       help_text='Original billed amount')
-    paid_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True,
-                                     help_text='Amount actually paid (may differ from allowed)')
-    payment_date = models.DateField(blank=True, null=True,
-                                   help_text='Actual payment date (if different from decided_date)')
+    billed_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Original billed amount",
+    )
+    paid_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Amount actually paid (may differ from allowed)",
+    )
+    payment_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Actual payment date (if different from decided_date)",
+    )
 
     # Authorization tracking
-    authorization_required = models.BooleanField(default=False, db_index=True,
-                                                help_text='Whether prior auth was required')
+    authorization_required = models.BooleanField(
+        default=False, db_index=True, help_text="Whether prior auth was required"
+    )
     authorization_number = models.CharField(max_length=100, blank=True, null=True)
-    authorization_obtained = models.BooleanField(default=False,
-                                                help_text='Whether auth was obtained before service')
+    authorization_obtained = models.BooleanField(
+        default=False, help_text="Whether auth was obtained before service"
+    )
 
     # Claim complexity indicators
-    modifier_codes = models.JSONField(default=list, blank=True,
-                                     help_text='List of modifier codes used')
-    diagnosis_codes = models.JSONField(default=list, blank=True,
-                                      help_text='List of diagnosis codes')
-    procedure_count = models.IntegerField(default=1,
-                                        help_text='Number of procedures on this claim')
+    modifier_codes = models.JSONField(
+        default=list, blank=True, help_text="List of modifier codes used"
+    )
+    diagnosis_codes = models.JSONField(
+        default=list, blank=True, help_text="List of diagnosis codes"
+    )
+    procedure_count = models.IntegerField(
+        default=1, help_text="Number of procedures on this claim"
+    )
 
     # Data quality tracking
     data_quality_score = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
         blank=True,
         null=True,
-        help_text='Quality score for this claim (0.0 = poor, 1.0 = perfect)'
+        help_text="Quality score for this claim (0.0 = poor, 1.0 = perfect)",
     )
     data_quality_flags = models.JSONField(
         default=list,
         blank=True,
-        help_text='List of quality issues: [{severity, message, field}]'
+        help_text="List of quality issues: [{severity, message, field}]",
     )
 
     # Validation metadata
@@ -287,10 +342,15 @@ class ClaimRecord(models.Model):
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
     # Source data tracking (for audit trail)
-    source_row_number = models.IntegerField(blank=True, null=True,
-                                          help_text='Row number in source CSV file')
-    source_data_hash = models.CharField(max_length=64, blank=True, null=True,
-                                       help_text='SHA-256 hash of source row for deduplication')
+    source_row_number = models.IntegerField(
+        blank=True, null=True, help_text="Row number in source CSV file"
+    )
+    source_data_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="SHA-256 hash of source row for deduplication",
+    )
 
     # Tenant isolation
     objects = CustomerScopedManager()
@@ -298,19 +358,45 @@ class ClaimRecord(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['customer', 'submitted_date'], name='claim_cust_subdate_idx'),
-            models.Index(fields=['customer', 'decided_date'], name='claim_cust_decdate_idx'),
-            models.Index(fields=['customer', 'payer', 'submitted_date'], name='claim_cust_payer_date_idx'),
-            models.Index(fields=['customer', 'outcome', 'decided_date'], name='claim_cust_outcome_idx'),
+            models.Index(
+                fields=["customer", "submitted_date"], name="claim_cust_subdate_idx"
+            ),
+            models.Index(
+                fields=["customer", "decided_date"], name="claim_cust_decdate_idx"
+            ),
+            models.Index(
+                fields=["customer", "payer", "submitted_date"],
+                name="claim_cust_payer_date_idx",
+            ),
+            models.Index(
+                fields=["customer", "outcome", "decided_date"],
+                name="claim_cust_outcome_idx",
+            ),
+            # CRIT-3: Composite index for common filter patterns
+            models.Index(
+                fields=["customer", "payer", "outcome", "submitted_date"],
+                name="claim_payer_outcome_idx",
+            ),
             # New indexes for advanced features
-            models.Index(fields=['customer', 'authorization_required', 'authorization_obtained'],
-                        name='claim_auth_idx'),
-            models.Index(fields=['customer', 'validation_passed', 'processed_at'],
-                        name='claim_validation_idx'),
-            models.Index(fields=['customer', 'payment_date'], name='claim_payment_date_idx'),
+            models.Index(
+                fields=["customer", "authorization_required", "authorization_obtained"],
+                name="claim_auth_idx",
+            ),
+            models.Index(
+                fields=["customer", "validation_passed", "processed_at"],
+                name="claim_validation_idx",
+            ),
+            models.Index(
+                fields=["customer", "payment_date"], name="claim_payment_date_idx"
+            ),
             # QW-2: Performance indexes for common query patterns
-            models.Index(fields=['customer', 'payer', 'cpt_group'], name='claim_drift_detect_idx'),
-            models.Index(fields=['customer', 'submitted_date', 'decided_date'], name='claim_lag_analysis_idx'),
+            models.Index(
+                fields=["customer", "payer", "cpt_group"], name="claim_drift_detect_idx"
+            ),
+            models.Index(
+                fields=["customer", "submitted_date", "decided_date"],
+                name="claim_lag_analysis_idx",
+            ),
         ]
 
     def __str__(self):
@@ -356,24 +442,29 @@ class ClaimRecord(models.Model):
         score += min(len(self.diagnosis_codes or []) / 2, 2)
         return min(int(score), 10)
 
+
 class ReportRun(models.Model):
     REPORT_TYPE_CHOICES = [
-        ('weekly', 'Weekly'),
-        ('monthly', 'Monthly'),
-        ('custom', 'Custom'),
+        ("weekly", "Weekly"),
+        ("monthly", "Monthly"),
+        ("custom", "Custom"),
     ]
 
     STATUS_CHOICES = [
-        ('running', 'Running'),
-        ('success', 'Success'),
-        ('failed', 'Failed'),
+        ("running", "Running"),
+        ("success", "Success"),
+        ("failed", "Failed"),
     ]
 
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='report_runs')
-    run_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, default='weekly')
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="report_runs"
+    )
+    run_type = models.CharField(
+        max_length=20, choices=REPORT_TYPE_CHOICES, default="weekly"
+    )
     started_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='running')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="running")
     summary_json = models.JSONField(blank=True, null=True)
 
     # Tenant isolation
@@ -383,26 +474,35 @@ class ReportRun(models.Model):
     def __str__(self):
         return f"Report {self.id} - {self.run_type} ({self.status})"
 
+
 class DriftEvent(models.Model):
     DRIFT_TYPE_CHOICES = [
-        ('DENIAL_RATE', 'Denial Rate'),
-        ('DECISION_TIME', 'Decision Time'),
-        ('PAYMENT_AMOUNT', 'Payment Amount'),
-        ('APPROVAL_RATE', 'Approval Rate'),
-        ('PROCESSING_DELAY', 'Processing Delay'),
-        ('AUTH_FAILURE_RATE', 'Authorization Failure Rate'),
+        ("DENIAL_RATE", "Denial Rate"),
+        ("DECISION_TIME", "Decision Time"),
+        ("PAYMENT_AMOUNT", "Payment Amount"),
+        ("APPROVAL_RATE", "Approval Rate"),
+        ("PROCESSING_DELAY", "Processing Delay"),
+        ("AUTH_FAILURE_RATE", "Authorization Failure Rate"),
     ]
 
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='drift_events')
-    report_run = models.ForeignKey(ReportRun, on_delete=models.CASCADE, related_name='drift_events')
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="drift_events"
+    )
+    report_run = models.ForeignKey(
+        ReportRun, on_delete=models.CASCADE, related_name="drift_events"
+    )
     payer = models.TextField()
     cpt_group = models.TextField()
     drift_type = models.CharField(max_length=30, choices=DRIFT_TYPE_CHOICES)
     baseline_value = models.FloatField()
     current_value = models.FloatField()
     delta_value = models.FloatField()
-    severity = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
-    confidence = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    severity = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    confidence = models.FloatField(
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
     baseline_start = models.DateField()
     baseline_end = models.DateField()
     current_start = models.DateField()
@@ -410,17 +510,20 @@ class DriftEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Advanced statistical fields (additive)
-    baseline_sample_size = models.IntegerField(default=0,
-                                              help_text='Number of claims in baseline period')
-    current_sample_size = models.IntegerField(default=0,
-                                             help_text='Number of claims in current period')
-    baseline_std_dev = models.FloatField(blank=True, null=True,
-                                        help_text='Standard deviation of baseline')
+    baseline_sample_size = models.IntegerField(
+        default=0, help_text="Number of claims in baseline period"
+    )
+    current_sample_size = models.IntegerField(
+        default=0, help_text="Number of claims in current period"
+    )
+    baseline_std_dev = models.FloatField(
+        blank=True, null=True, help_text="Standard deviation of baseline"
+    )
     statistical_significance = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
         blank=True,
         null=True,
-        help_text='P-value from statistical test (lower = more significant)'
+        help_text="P-value from statistical test (lower = more significant)",
     )
 
     # Financial impact tracking
@@ -429,33 +532,40 @@ class DriftEvent(models.Model):
         decimal_places=2,
         blank=True,
         null=True,
-        help_text='Estimated monthly revenue impact of this drift'
+        help_text="Estimated monthly revenue impact of this drift",
     )
 
     # Trend analysis
     trend_direction = models.CharField(
         max_length=20,
-        choices=[('improving', 'Improving'), ('degrading', 'Degrading'), ('stable', 'Stable')],
-        default='stable',
-        db_index=True
+        choices=[
+            ("improving", "Improving"),
+            ("degrading", "Degrading"),
+            ("stable", "Stable"),
+        ],
+        default="stable",
+        db_index=True,
     )
     consecutive_periods = models.IntegerField(
-        default=1,
-        help_text='Number of consecutive periods this drift has persisted'
+        default=1, help_text="Number of consecutive periods this drift has persisted"
     )
 
     # Root cause hints
     potential_root_causes = models.JSONField(
         default=list,
         blank=True,
-        help_text='AI-suggested root causes: [{cause, likelihood}]'
+        help_text="AI-suggested root causes: [{cause, likelihood}]",
     )
 
     # Suppression tracking
-    suppressed = models.BooleanField(default=False, db_index=True,
-                                    help_text='Whether this event was suppressed from alerting')
-    suppression_reason = models.TextField(blank=True,
-                                         help_text='Why this event was suppressed')
+    suppressed = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Whether this event was suppressed from alerting",
+    )
+    suppression_reason = models.TextField(
+        blank=True, help_text="Why this event was suppressed"
+    )
 
     # Tenant isolation
     objects = CustomerScopedManager()
@@ -463,17 +573,35 @@ class DriftEvent(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['customer', '-created_at'], name='drift_cust_created_idx'),
-            models.Index(fields=['customer', 'payer', 'drift_type'], name='drift_cust_payer_type_idx'),
-            models.Index(fields=['customer', 'drift_type', '-created_at'], name='drift_cust_type_date_idx'),
+            models.Index(
+                fields=["customer", "-created_at"], name="drift_cust_created_idx"
+            ),
+            models.Index(
+                fields=["customer", "payer", "drift_type"],
+                name="drift_cust_payer_type_idx",
+            ),
+            models.Index(
+                fields=["customer", "drift_type", "-created_at"],
+                name="drift_cust_type_date_idx",
+            ),
             # New indexes
-            models.Index(fields=['customer', 'trend_direction', '-severity'],
-                        name='drift_trend_sev_idx'),
-            models.Index(fields=['customer', 'suppressed', '-created_at'],
-                        name='drift_suppressed_idx'),
+            models.Index(
+                fields=["customer", "trend_direction", "-severity"],
+                name="drift_trend_sev_idx",
+            ),
+            models.Index(
+                fields=["customer", "suppressed", "-created_at"],
+                name="drift_suppressed_idx",
+            ),
             # QW-2: Performance indexes for dashboard and filtering
-            models.Index(fields=['customer', 'report_run', '-severity'], name='drift_report_sev_idx'),
-            models.Index(fields=['payer', 'cpt_group', '-created_at'], name='drift_hist_trend_idx'),
+            models.Index(
+                fields=["customer", "report_run", "-severity"],
+                name="drift_report_sev_idx",
+            ),
+            models.Index(
+                fields=["payer", "cpt_group", "-created_at"],
+                name="drift_hist_trend_idx",
+            ),
         ]
 
     def __str__(self):
@@ -497,87 +625,95 @@ class DriftEvent(models.Model):
     def severity_label(self):
         """Human-readable severity label."""
         if self.severity >= 0.9:
-            return 'Critical'
+            return "Critical"
         elif self.severity >= 0.7:
-            return 'High'
+            return "High"
         elif self.severity >= 0.4:
-            return 'Medium'
+            return "Medium"
         else:
-            return 'Low'
+            return "Low"
 
     @property
     def confidence_label(self):
         """Human-readable confidence label."""
         if self.confidence >= 0.9:
-            return 'Very High'
+            return "Very High"
         elif self.confidence >= 0.75:
-            return 'High'
+            return "High"
         elif self.confidence >= 0.6:
-            return 'Medium'
+            return "Medium"
         else:
-            return 'Low'
+            return "Low"
+
 
 class UserProfile(models.Model):
     """User profile linking users to customers with roles."""
-    
+
     ROLE_CHOICES = [
-        ('owner', 'Owner'),
-        ('admin', 'Admin'),
-        ('analyst', 'Analyst'),
-        ('viewer', 'Viewer'),
+        ("owner", "Owner"),
+        ("admin", "Admin"),
+        ("analyst", "Analyst"),
+        ("viewer", "Viewer"),
     ]
-    
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='user_profiles')
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='viewer')
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile"
+    )
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="user_profiles"
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="viewer")
 
     def __str__(self):
         return f"Profile for {self.user.username} ({self.role}) -> {self.customer.name}"
-    
+
     @property
     def is_owner(self):
-        return self.role == 'owner'
-    
+        return self.role == "owner"
+
     @property
     def is_admin(self):
-        return self.role in ('owner', 'admin')
-    
+        return self.role in ("owner", "admin")
+
     @property
     def is_analyst(self):
-        return self.role in ('owner', 'admin', 'analyst')
-    
+        return self.role in ("owner", "admin", "analyst")
+
     @property
     def can_manage_users(self):
         """Check if user can manage team members."""
-        return self.role in ('owner', 'admin')
-    
+        return self.role in ("owner", "admin")
+
     @property
     def can_manage_alerts(self):
         """Check if user can manage alert rules and routing."""
-        return self.role in ('owner', 'admin')
-    
+        return self.role in ("owner", "admin")
+
     @property
     def can_manage_webhooks(self):
         """Check if user can manage webhooks."""
-        return self.role in ('owner', 'admin')
-    
+        return self.role in ("owner", "admin")
+
     @property
     def can_upload_claims(self):
         """Check if user can upload claim files."""
-        return self.role in ('owner', 'admin', 'analyst')
-    
+        return self.role in ("owner", "admin", "analyst")
+
     @property
     def can_manage_mappings(self):
         """Check if user can manage payer/CPT mappings."""
-        return self.role in ('owner', 'admin', 'analyst')
-    
+        return self.role in ("owner", "admin", "analyst")
+
     @property
     def can_view_reports(self):
         """Check if user can view reports and drift feed."""
         return True  # All roles can view
 
+
 class PayerMapping(models.Model):
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='payer_mappings')
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="payer_mappings"
+    )
     raw_name = models.CharField(max_length=255)
     normalized_name = models.CharField(max_length=255)
 
@@ -586,13 +722,16 @@ class PayerMapping(models.Model):
     all_objects = models.Manager()  # Unfiltered access for superusers
 
     class Meta:
-        unique_together = ('customer', 'raw_name')
+        unique_together = ("customer", "raw_name")
 
     def __str__(self):
         return f"{self.raw_name} -> {self.normalized_name}"
 
+
 class CPTGroupMapping(models.Model):
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='cpt_group_mappings')
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="cpt_group_mappings"
+    )
     cpt_code = models.CharField(max_length=10)
     cpt_group = models.CharField(max_length=50)
 
@@ -601,7 +740,7 @@ class CPTGroupMapping(models.Model):
     all_objects = models.Manager()  # Unfiltered access for superusers
 
     class Meta:
-        unique_together = ('customer', 'cpt_code')
+        unique_together = ("customer", "cpt_code")
 
     def __str__(self):
         return f"{self.cpt_code} -> {self.cpt_group}"

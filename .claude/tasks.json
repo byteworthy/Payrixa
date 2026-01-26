@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "id": "CRIT-9",
+      "source": "security-audit",
+      "title": "Fix .env File Permissions (Critical Security Issue)",
+      "branch": "fix/env-permissions-security-crit9",
+      "worktreePath": "/workspaces/codespaces-django/../worktrees/fix-env-permissions-security-crit9",
+      "claimedAt": "2026-01-25T23:51:00Z",
+      "claimedBy": "worktree-manager-crit9",
+      "status": "claimed",
+      "lastActivityAt": "2026-01-25T23:51:00Z"
+    }
+  ]
+}

@@ -14,10 +14,14 @@ logs/
 
 # Google Cloud SDK - too large for GitHub
 google-cloud-cli-*.tar.gz
-google-cloud-sdk/platform/bundledpythonunix/
+google-cloud-sdk/
 
 # Agent directories (submodules or large binaries)
 .agents/anthropic-skills/
 .agents/claude-antigravity/
 .agents/ralph/
 .agents/superpowers/
+.agents/awesome-slash/
+
+# Marketing site (separate project)
+upstream-marketing/
