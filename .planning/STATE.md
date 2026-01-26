@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 2 of 5 (API Pagination & Filtering)
-Plan: 1 of 2
-Status: In progress
-Last activity: 2026-01-26 — Completed 02-01-PLAN.md (API filtering with django-filter)
+Plan: 2 of 2
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 02-02-PLAN.md (Pagination and filtering tests)
 
-Progress: [███░░░░░░░] 30%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 6 min
-- Total execution time: 0.3 hours
+- Total plans completed: 4
+- Average duration: 28 min
+- Total execution time: 1.9 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 2 | 15 min | 7.5 min |
-| 2 | 1 | 3 min | 3 min |
+| 2 | 2 | 85 min | 42.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 3min, 12min
-- Trend: Faster execution (3 min last 2 plans)
+- Last 5 plans: 82min, 3min, 3min, 12min
+- Trend: High variability (3-82 min range, most recent plan had bug fixes)
 
 *Updated after each plan completion*
 
@@ -55,6 +55,9 @@ Recent decisions affecting current work:
 - Use django-filter for declarative filtering: Replace hand-rolled filter logic with battle-tested FilterSet classes (02-01)
 - Configure DEFAULT_FILTER_BACKENDS globally: Automatic inheritance with per-ViewSet customization (02-01)
 - Keep CustomerFilterMixin separate from FilterSets: Tenant isolation runs before FilterSet filtering (02-01)
+- DRF throttle rates use short suffixes only: Parser supports h/m/d/s not hour/minute/day (02-02)
+- Custom actions need manual pagination: Call self.paginate_queryset() since DRF auto-pagination only applies to list() (02-02)
+- Authentication throttle at 5/h: DRF doesn't support custom periods like 15m, use standard periods only (02-02)
 
 ### Pending Todos
 
@@ -69,16 +72,23 @@ None yet.
 - ✓ SQLite compatibility added via database vendor detection in migrations
 - Note: Pre-commit hooks (code-quality-audit, test-coverage-check) fail in SQLite without AgentRun table - skip these hooks for now
 
+**Phase 2 Complete:**
+- ✓ DjangoFilterBackend integration for declarative filtering
+- ✓ Paginated custom actions (payer_summary, active) with consistent response structure
+- ✓ 12 new filter/pagination tests with comprehensive coverage
+- ✓ OpenAPI schema validates (0 errors) with auto-documented filter parameters
+- Note: 3 pre-existing tests fail due to Phase 1 unique constraint (not related to Phase 2 work)
+- Issue: DRF throttle parser limitations prevent custom time periods like 15m
+
 **Dependencies Noted:**
-- API filtering (Phase 2) depends on pagination working correctly
 - OpenAPI documentation (Phase 3) benefits from standardized errors
 - Performance testing (Phase 5) needs pagination to handle large result sets
 
 ## Session Continuity
 
-Last session: 2026-01-26 20:04:22 (plan execution)
-Stopped at: Completed 02-01-PLAN.md (API filtering with django-filter)
+Last session: 2026-01-26 21:29:28 (plan execution)
+Stopped at: Completed 02-02-PLAN.md (Pagination and filtering tests)
 Resume file: None
 
 ---
-*Phase 2 in progress: 1 of 2 plans complete. Next: 02-02 cursor pagination.*
+*Phase 2 complete: 2 of 2 plans complete. Ready for Phase 3.*
