@@ -24,6 +24,29 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Notify deployment start
+      if: secrets.SLACK_WEBHOOK_URL != '' || secrets.DISCORD_WEBHOOK_URL != ''
+      continue-on-error: true
+      run: |
+        COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
+        COMMIT_SHA_SHORT=$(git rev-parse --short HEAD)
+        ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+        TRIGGERED_BY="${{ github.actor }}"
+
+        # Slack notification
+        if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"🚀 *Deployment started*\n*Environment:* ${ENVIRONMENT}\n*Commit:* \`${COMMIT_SHA_SHORT}\` - ${COMMIT_MSG}\n*Triggered by:* ${TRIGGERED_BY}\"}"
+        fi
+
+        # Discord notification
+        if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\":\"🚀 **Deployment started**\n**Environment:** ${ENVIRONMENT}\n**Commit:** \`${COMMIT_SHA_SHORT}\` - ${COMMIT_MSG}\n**Triggered by:** ${TRIGGERED_BY}\"}"
+        fi
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -85,6 +108,50 @@ jobs:
           --retry-delay 15
       env:
         DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+
+    - name: Notify deployment success
+      if: success() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.DISCORD_WEBHOOK_URL != '')
+      continue-on-error: true
+      run: |
+        COMMIT_SHA_SHORT=$(git rev-parse --short HEAD)
+        ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+        DEPLOYMENT_URL="${{ vars.DEPLOYMENT_URL }}"
+
+        # Slack notification with green color
+        if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"attachments\":[{\"color\":\"good\",\"text\":\"✅ *Deployment succeeded*\n*Environment:* ${ENVIRONMENT}\n*Commit:* \`${COMMIT_SHA_SHORT}\`\n*URL:* ${DEPLOYMENT_URL:-'Not configured'}\"}]}"
+        fi
+
+        # Discord notification
+        if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\":\"✅ **Deployment succeeded**\n**Environment:** ${ENVIRONMENT}\n**Commit:** \`${COMMIT_SHA_SHORT}\`\n**URL:** ${DEPLOYMENT_URL:-'Not configured'}\"}"
+        fi
+
+    - name: Notify deployment failure
+      if: failure() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.DISCORD_WEBHOOK_URL != '')
+      continue-on-error: true
+      run: |
+        COMMIT_SHA_SHORT=$(git rev-parse --short HEAD)
+        ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+        RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        # Slack notification with red color
+        if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"attachments\":[{\"color\":\"danger\",\"text\":\"❌ *Deployment failed*\n*Environment:* ${ENVIRONMENT}\n*Commit:* \`${COMMIT_SHA_SHORT}\`\n*View logs:* ${RUN_URL}\"}]}"
+        fi
+
+        # Discord notification
+        if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\":\"❌ **Deployment failed**\n**Environment:** ${ENVIRONMENT}\n**Commit:** \`${COMMIT_SHA_SHORT}\`\n**View logs:** ${RUN_URL}\"}"
+        fi
 
   validate-rollback-script:
     runs-on: ubuntu-latest
