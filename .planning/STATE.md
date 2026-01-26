@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 Phase: 3 of 6 (OpenAPI Documentation & Error Standardization)
 Plan: 0 of TBD (ready to start)
 Status: Ready for execution
-Last activity: 2026-01-26 — Completed quick tasks 001-002 (Prometheus metrics + structured logging)
+Last activity: 2026-01-26 — Completed quick task 007 (API versioning headers)
 
 Progress: [███████░░░] 67%
 
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - Rollback script uses health endpoint: Validates deployment recovery via existing health check (05-02)
 - Local mode for testing: Enables rollback script testing without actual deployment (05-02)
 - Extended timeouts in production: 60s timeout, 5 retries for cold starts and initialization (05-02)
+- Header-based API versioning: Use API-Version response header instead of URL-based /v1/ prefix (quick-007)
+- Semantic versioning for API: MAJOR.MINOR.PATCH with clear breaking vs non-breaking semantics (quick-007)
+- Start at version 1.0.0: API is production-ready and stable (quick-007)
 
 ### Pending Todos
 
@@ -78,6 +81,7 @@ None yet.
 | 001 | Add Prometheus metrics endpoint for production monitoring | 2026-01-26 | a1c9ce94, 9b49e8b2 | [001-add-prometheus-metrics-endpoint-for-pro](./quick/001-add-prometheus-metrics-endpoint-for-pro/) |
 | 002 | Enable structured JSON logging for better log aggregation | 2026-01-26 | 1c677db8, ea9884d3 | [002-enable-structured-json-logging-for-bett](./quick/002-enable-structured-json-logging-for-bett/) |
 | 004 | Configure log retention policy for HIPAA compliance | 2026-01-26 | 14cfe180, 842a97ea, ceadda09, 1d0761b6 | [004-configure-log-retention-policy-for-hipa](./quick/004-configure-log-retention-policy-for-hipa/) |
+| 007 | Add API versioning headers via middleware | 2026-01-26 | 0c2df206, 81a56c5f | [007-add-api-versioning-headers-via-middlewar](./quick/007-add-api-versioning-headers-via-middlewar/) |
 
 ### Blockers/Concerns
 
@@ -120,8 +124,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26 22:30:00 (plan execution)
-Stopped at: Completed Phase 4 (Webhook & RBAC testing)
+Last session: 2026-01-26 23:21:00 (quick task execution)
+Stopped at: Completed quick task 007 (API versioning headers)
 Resume file: None
 
 ---
