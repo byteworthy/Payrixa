@@ -581,6 +581,44 @@ fi
 
 ---
 
+### ~~HIGH-12: Missing Unique Constraints on Hash Fields~~ ✅ RESOLVED
+**Domain**: Database
+**File**: upstream/models.py:106-120 (Upload), 379-393 (ClaimRecord)
+**Impact**: Deduplication not working, duplicate data possible
+**Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
+
+**Resolution**:
+- Added unique constraint on `Upload.file_hash` scoped to customer
+- Added unique constraint on `ClaimRecord.source_data_hash` scoped to customer+upload
+- Both constraints use partial uniqueness (only when hash is not null)
+- Created migrations 0005 and 0006 to apply constraints and indexes
+- Added database indexes for hash fields to improve lookup performance
+- **Constraint Names**:
+  * `upload_unique_file_hash_per_customer` - prevents duplicate file uploads
+  * `claim_unique_source_hash_per_upload` - prevents duplicate row processing
+- **Indexes Added**:
+  * `upload_file_hash_idx` on (customer, file_hash)
+  * `claim_source_hash_idx` on (customer, upload, source_data_hash)
+- Created comprehensive test suite (`test_unique_hash_constraints.py`) with 7 tests:
+  * Upload.file_hash unique per customer
+  * Same hash allowed for different customers (multi-tenancy)
+  * Null hashes allowed (partial uniqueness)
+  * ClaimRecord.source_data_hash unique per upload
+  * Same hash allowed for different uploads
+  * Null source hashes allowed
+  * Hash field indexes exist for performance
+- **Expected Impact**:
+  * Deduplication now works reliably at database level
+  * Prevents duplicate file uploads within a customer
+  * Prevents duplicate row processing within an upload
+  * Maintains multi-tenancy isolation
+  * No performance degradation (indexes added)
+- **Multi-tenancy Preserved**: Different customers can have same hash (same file)
+- **Backward Compatible**: Null hashes are allowed (existing data unaffected)
+
+---
+
 ## Medium Priority Issues (77)
 
 *(Categorized by domain, top items shown)*
@@ -593,9 +631,8 @@ fi
 - Missing indexes for recovery stats
 - Inefficient serializer method fields
 
-### Database (12 issues)
+### Database (11 issues)
 - Missing indexes on ForeignKeys, date ranges, JSON fields
-- No unique constraints on hash fields
 - Missing NOT NULL on critical fields
 - No transaction isolation for concurrent drift
 - Inefficient count queries
@@ -783,15 +820,15 @@ fi
 
 ## Progress Tracking
 
-**Current Status**: Phase 2 - IN PROGRESS (20/43 Critical+High Issues Resolved - 46.5%) 🚧
+**Current Status**: Phase 2 - IN PROGRESS (21/43 Critical+High Issues Resolved - 48.8%) 🚧
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 111 | 84.7% |
+| To Do | 110 | 84.0% |
 | In Progress | 0 | 0% |
-| Done | 20 | 15.3% |
+| Done | 21 | 16.0% |
 
 ### By Domain Completion
 
@@ -801,7 +838,7 @@ fi
 | Performance | 18 | 5 | 27.8% |
 | Testing | 17 | 1 | 5.9% |
 | Architecture | 21 | 1 | 4.8% |
-| Database | 22 | 2 | 9.1% |
+| Database | 22 | 3 | 13.6% |
 | API | 23 | 2 | 8.7% |
 | DevOps | 30 | 7 | 23.3% |
 
@@ -819,7 +856,7 @@ fi
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 - ✅ **CRIT-10**: No rollback strategy in deployments (cloudbuild.yaml, scripts/smoke_test.py)
 
-**Phase 2 - High Priority Issues (11/33 - 33.3%)** 🚧
+**Phase 2 - High Priority Issues (12/33 - 36.4%)** 🚧
 - ✅ **HIGH-1**: JWT token blacklist configuration (upstream/settings/base.py)
 - ✅ **HIGH-2**: Rate limiting on auth endpoints (upstream/api/throttling.py, views.py, urls.py)
 - ✅ **HIGH-3**: N+1 query in AlertEvent processing (upstream/products/delayguard/views.py)
@@ -831,6 +868,7 @@ fi
 - ✅ **HIGH-9**: Dependency pinning for reproducible deployments (requirements-lock.txt, Dockerfile)
 - ✅ **HIGH-10**: Container vulnerability scanning (.github/workflows/docker.yml)
 - ✅ **HIGH-11**: Database connection pooling configuration (upstream/settings/prod.py, docs/DATABASE_CONNECTION_POOLING.md)
+- ✅ **HIGH-12**: Unique constraints on hash fields (upstream/models.py, migrations/0005-0006)
 
 ---
 

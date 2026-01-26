@@ -103,6 +103,24 @@ class Upload(models.Model):
     objects = CustomerScopedManager()
     all_objects = models.Manager()  # Unfiltered access for superusers
 
+    class Meta:
+        constraints = [
+            # HIGH-12: Unique constraint on file_hash for deduplication
+            # Prevents duplicate file uploads within a customer's scope
+            models.UniqueConstraint(
+                fields=["customer", "file_hash"],
+                condition=models.Q(file_hash__isnull=False),
+                name="upload_unique_file_hash_per_customer",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["customer", "uploaded_at"], name="upload_cust_date_idx"
+            ),
+            models.Index(fields=["customer", "status"], name="upload_cust_status_idx"),
+            models.Index(fields=["customer", "file_hash"], name="upload_file_hash_idx"),
+        ]
+
     @property
     def quality_score(self):
         """Calculate data quality score (0.0 to 1.0)."""
@@ -359,6 +377,15 @@ class ClaimRecord(models.Model):
     all_objects = models.Manager()  # Unfiltered access for superusers
 
     class Meta:
+        constraints = [
+            # HIGH-12: Unique constraint on source_data_hash for deduplication
+            # Prevents duplicate row processing within an upload
+            models.UniqueConstraint(
+                fields=["customer", "upload", "source_data_hash"],
+                condition=models.Q(source_data_hash__isnull=False),
+                name="claim_unique_source_hash_per_upload",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["customer", "submitted_date"], name="claim_cust_subdate_idx"
@@ -398,6 +425,11 @@ class ClaimRecord(models.Model):
             models.Index(
                 fields=["customer", "submitted_date", "decided_date"],
                 name="claim_lag_analysis_idx",
+            ),
+            # HIGH-12: Index for source_data_hash lookups
+            models.Index(
+                fields=["customer", "upload", "source_data_hash"],
+                name="claim_source_hash_idx",
             ),
         ]
 
