@@ -54,10 +54,10 @@ def evaluate_drift_event(drift_event):
                 'payer': drift_event.payer,
                 'cpt_group': drift_event.cpt_group,
                 'drift_type': drift_event.drift_type,
-                'baseline_value': drift_event.baseline_value,
-                'current_value': drift_event.current_value,
-                'delta_value': drift_event.delta_value,
-                'severity': drift_event.severity,
+                'baseline_value': float(drift_event.baseline_value),
+                'current_value': float(drift_event.current_value),
+                'delta_value': float(drift_event.delta_value),
+                'severity': float(drift_event.severity),
                 'rule_name': rule.name,
                 'rule_threshold': rule.threshold_value,
             }
@@ -78,7 +78,7 @@ def evaluate_drift_event(drift_event):
                     'alert_rule': rule.name,
                     'drift_event_id': drift_event.id,
                     'payer': drift_event.payer,
-                    'severity': drift_event.severity
+                    'severity': float(drift_event.severity)
                 }
             )
     return alert_events
@@ -131,12 +131,12 @@ def evaluate_payment_delay_signal(payment_delay_signal):
         'signal_type': 'payment_delay_drift',
         'entity_label': payment_delay_signal.payer,
         'payer': payment_delay_signal.payer,
-        'baseline_avg_days': payment_delay_signal.baseline_avg_days,
-        'current_avg_days': payment_delay_signal.current_avg_days,
-        'delta_days': payment_delay_signal.delta_days,
-        'delta_percent': payment_delay_signal.delta_percent,
+        'baseline_avg_days': float(payment_delay_signal.baseline_avg_days),
+        'current_avg_days': float(payment_delay_signal.current_avg_days),
+        'delta_days': float(payment_delay_signal.delta_days),
+        'delta_percent': float(payment_delay_signal.delta_percent),
         'severity': payment_delay_signal.severity,
-        'confidence': payment_delay_signal.confidence,
+        'confidence': float(payment_delay_signal.confidence),
         'estimated_dollars_at_risk': str(payment_delay_signal.estimated_dollars_at_risk),
         'rule_name': alert_rule.name,
     }
@@ -166,7 +166,7 @@ def evaluate_payment_delay_signal(payment_delay_signal):
             'payment_delay_signal_id': payment_delay_signal.id,
             'payer': payment_delay_signal.payer,
             'severity': payment_delay_signal.severity,
-            'delta_days': payment_delay_signal.delta_days,
+            'delta_days': float(payment_delay_signal.delta_days),
         }
     )
 

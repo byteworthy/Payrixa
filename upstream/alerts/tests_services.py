@@ -31,14 +31,18 @@ from upstream.alerts.services import (
     _is_suppressed,
     get_suppression_context,
 )
+from upstream.core.tenant import customer_context, set_current_customer, clear_current_customer
 
 
 class EvaluateDriftEventTests(TestCase):
     """Tests for evaluate_drift_event function."""
 
     def setUp(self):
-        """Create test fixtures."""
+        """Create test fixtures and set customer context."""
         self.customer = Customer.objects.create(name="Test Healthcare Corp")
+
+        # Set customer context for tenant-isolated queries
+        set_current_customer(self.customer)
 
         self.report_run = ReportRun.objects.create(
             customer=self.customer,
@@ -62,6 +66,10 @@ class EvaluateDriftEventTests(TestCase):
             current_start=today - timedelta(days=14),
             current_end=today,
         )
+
+    def tearDown(self):
+        """Clean up customer context."""
+        clear_current_customer()
 
     def test_evaluate_drift_event_creates_alert(self):
         """Test that drift event evaluation creates alert when rule matches."""
@@ -157,7 +165,7 @@ class EvaluateDriftEventTests(TestCase):
         )
 
         # Evaluate and create alert
-        with patch("upstream.alerts.services.create_audit_event") as mock_audit:
+        with patch("upstream.core.services.create_audit_event") as mock_audit:
             evaluate_drift_event(self.drift_event)
 
             # Should have called create_audit_event
@@ -172,21 +180,45 @@ class EvaluatePaymentDelaySignalTests(TestCase):
     """Tests for evaluate_payment_delay_signal function."""
 
     def setUp(self):
-        """Create test fixtures."""
+        """Create test fixtures and set customer context."""
         self.customer = Customer.objects.create(name="DelayGuard Test Corp")
 
+        # Set customer context for tenant-isolated queries
+        set_current_customer(self.customer)
+
+        # Create alert rule (required by evaluate_payment_delay_signal)
+        self.alert_rule = AlertRule.objects.create(
+            customer=self.customer,
+            name="DelayGuard Alert Rule",
+            enabled=True,
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.50,
+        )
+
+        today = timezone.now().date()
         self.payment_signal = PaymentDelaySignal.objects.create(
             customer=self.customer,
             payer="UnitedHealthcare",
             signal_type="payment_delay_drift",
-            baseline_avg_days=Decimal("30.0"),
-            current_avg_days=Decimal("45.0"),
-            delta_days=Decimal("15.0"),
-            delta_percent=Decimal("50.0"),
+            window_start_date=today - timedelta(days=14),
+            window_end_date=today,
+            baseline_start_date=today - timedelta(days=104),
+            baseline_end_date=today - timedelta(days=14),
+            baseline_avg_days=30.0,
+            current_avg_days=45.0,
+            delta_days=15.0,
+            delta_percent=50.0,
+            baseline_claim_count=100,
+            current_claim_count=80,
             severity="high",
             confidence=Decimal("0.85"),
             estimated_dollars_at_risk=Decimal("150000.00"),
         )
+
+    def tearDown(self):
+        """Clean up customer context."""
+        clear_current_customer()
 
     def test_evaluate_payment_delay_creates_alert(self):
         """Test that payment delay signals create alerts."""
@@ -201,14 +233,21 @@ class EvaluatePaymentDelaySignalTests(TestCase):
 
     def test_evaluate_low_severity_low_confidence_suppressed(self):
         """Test that low severity + low confidence signals are suppressed."""
+        today = timezone.now().date()
         low_signal = PaymentDelaySignal.objects.create(
             customer=self.customer,
             payer="LowSignalPayer",
             signal_type="payment_delay_drift",
-            baseline_avg_days=Decimal("30.0"),
-            current_avg_days=Decimal("32.0"),
-            delta_days=Decimal("2.0"),
-            delta_percent=Decimal("6.7"),
+            window_start_date=today - timedelta(days=14),
+            window_end_date=today,
+            baseline_start_date=today - timedelta(days=104),
+            baseline_end_date=today - timedelta(days=14),
+            baseline_avg_days=30.0,
+            current_avg_days=32.0,
+            delta_days=2.0,
+            delta_percent=6.7,
+            baseline_claim_count=100,
+            current_claim_count=90,
             severity="low",
             confidence=Decimal("0.45"),  # Below threshold
             estimated_dollars_at_risk=Decimal("5000.00"),
@@ -235,8 +274,11 @@ class AlertSuppressionTests(TestCase):
     """Tests for alert suppression logic."""
 
     def setUp(self):
-        """Create test fixtures."""
+        """Create test fixtures and set customer context."""
         self.customer = Customer.objects.create(name="Suppression Test Corp")
+
+        # Set customer context for tenant-isolated queries
+        set_current_customer(self.customer)
 
         self.alert_rule = AlertRule.objects.create(
             customer=self.customer,
@@ -247,6 +289,10 @@ class AlertSuppressionTests(TestCase):
             threshold_value=0.70,
         )
 
+    def tearDown(self):
+        """Clean up customer context."""
+        clear_current_customer()
+
     def test_suppression_cooldown_period(self):
         """Test that recent alerts trigger cooldown suppression."""
         # Create recent alert (2 hours ago)
@@ -255,7 +301,8 @@ class AlertSuppressionTests(TestCase):
             customer=self.customer,
             alert_rule=self.alert_rule,
             triggered_at=recent_time,
-            status="delivered",
+            status="sent",
+            notification_sent_at=recent_time,
             payload={
                 "product_name": "DriftWatch",
                 "signal_type": "DENIAL_RATE",
@@ -319,11 +366,13 @@ class AlertSuppressionTests(TestCase):
     def test_no_suppression_different_payer(self):
         """Test that alerts for different payers are not suppressed."""
         # Create recent alert for Payer A
+        notification_time = timezone.now() - timedelta(hours=1)
         recent_alert = AlertEvent.objects.create(
             customer=self.customer,
             alert_rule=self.alert_rule,
-            triggered_at=timezone.now() - timedelta(hours=1),
-            status="delivered",
+            triggered_at=notification_time,
+            status="sent",
+            notification_sent_at=notification_time,
             payload={
                 "product_name": "DriftWatch",
                 "signal_type": "DENIAL_RATE",
@@ -351,8 +400,11 @@ class SendEmailNotificationTests(TestCase):
     """Tests for email notification sending."""
 
     def setUp(self):
-        """Create test fixtures."""
+        """Create test fixtures and set customer context."""
         self.customer = Customer.objects.create(name="Email Test Corp")
+
+        # Set customer context for tenant-isolated queries
+        set_current_customer(self.customer)
 
         self.alert_rule = AlertRule.objects.create(
             customer=self.customer,
@@ -409,11 +461,16 @@ class SendEmailNotificationTests(TestCase):
             },
         )
 
+    def tearDown(self):
+        """Clean up customer context."""
+        clear_current_customer()
+
     def test_send_email_notification_success(self):
         """Test that email notifications are sent successfully."""
         evidence_payload = {
             "product_name": "DriftWatch",
             "entity_label": "Aetna",
+            "severity": 0.75,
             "summary": "Denial rate increased significantly",
             "urgency_level": "high",
             "urgency_label": "Investigate Today",
@@ -426,7 +483,8 @@ class SendEmailNotificationTests(TestCase):
         email = mail.outbox[0]
         self.assertIn("ops@example.com", email.to)
         self.assertIn("alerts@example.com", email.to)
-        self.assertIn("Aetna", email.subject)
+        self.assertIn("DriftWatch", email.subject)
+        self.assertIn("Email Test Corp", email.subject)
 
     def test_send_email_notification_no_recipients(self):
         """Test that email fails gracefully with no recipients."""
@@ -452,8 +510,11 @@ class GetSuppressionContextTests(TestCase):
     """Tests for historical suppression context retrieval."""
 
     def setUp(self):
-        """Create test fixtures."""
+        """Create test fixtures and set customer context."""
         self.customer = Customer.objects.create(name="Context Test Corp")
+
+        # Set customer context for tenant-isolated queries
+        set_current_customer(self.customer)
 
         self.alert_rule = AlertRule.objects.create(
             customer=self.customer,
@@ -501,35 +562,40 @@ class GetSuppressionContextTests(TestCase):
             },
         )
 
+    def tearDown(self):
+        """Clean up customer context."""
+        clear_current_customer()
+
     def test_get_suppression_context_with_noise_judgment(self):
         """Test suppression context returns noise history."""
-        # Create historical alert marked as noise
-        past_alert = AlertEvent.objects.create(
-            customer=self.customer,
-            alert_rule=self.alert_rule,
-            drift_event=self.drift_event,
-            triggered_at=timezone.now() - timedelta(days=5),
-            status="resolved",
-            payload={
-                "product_name": "DriftWatch",
-                "signal_type": "DENIAL_RATE",
-                "entity_label": "ContextPayer",
-                "payer": "ContextPayer",
-            },
-        )
+        # Create 2 historical alerts marked as noise (threshold is 2)
+        for i in range(2):
+            past_alert = AlertEvent.objects.create(
+                customer=self.customer,
+                alert_rule=self.alert_rule,
+                drift_event=self.drift_event,
+                triggered_at=timezone.now() - timedelta(days=5 + i),
+                status="resolved",
+                payload={
+                    "product_name": "DriftWatch",
+                    "signal_type": "DENIAL_RATE",
+                    "entity_label": "ContextPayer",
+                    "payer": "ContextPayer",
+                },
+            )
 
-        OperatorJudgment.objects.create(
-            customer=self.customer,
-            alert_event=past_alert,
-            verdict="noise",
-            notes="False alarm",
-        )
+            OperatorJudgment.objects.create(
+                customer=self.customer,
+                alert_event=past_alert,
+                verdict="noise",
+                notes="False alarm",
+            )
 
         context = get_suppression_context(self.alert_event)
 
         self.assertIsNotNone(context)
-        self.assertEqual(context["verdict"], "noise")
-        self.assertIn("days_ago", context)
+        self.assertEqual(context["type"], "noise")
+        self.assertEqual(context["count"], 2)
 
     def test_get_suppression_context_no_history(self):
         """Test that no context returned when no historical alerts."""
