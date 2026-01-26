@@ -27,12 +27,12 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy requirements files (HIGH-9: Use lock file for reproducible builds)
+COPY requirements.txt requirements-lock.txt ./
 
-# Install Python dependencies including Gunicorn
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn
+# Install Python dependencies with exact pinned versions
+# Use requirements-lock.txt for reproducibility in production
+RUN pip install --no-cache-dir -r requirements-lock.txt
 
 # Copy application code
 COPY . .

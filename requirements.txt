@@ -1,3 +1,16 @@
+# High-level dependency constraints (HIGH-9)
+#
+# This file contains version constraints (~=) for direct dependencies.
+# For deployments, use requirements-lock.txt which has exact pinned versions.
+#
+# To update dependencies:
+# 1. Edit this file with desired version constraints
+# 2. Install in clean venv: pip install -r requirements.txt
+# 3. Regenerate lock file: pip freeze > requirements-lock.txt
+# 4. Update Dockerfile if needed
+#
+# See: TECHNICAL_DEBT.md HIGH-9 for rationale
+
 # Core Django
 asgiref~=3.8.1
 Django~=5.2.2
