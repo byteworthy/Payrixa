@@ -1433,12 +1433,12 @@ Despite being essential for alert workflow, it had ZERO test coverage, creating 
 ### Architecture (12 issues)
 - Business logic in views
 - Direct ORM queries in views
-- Missing drift detection abstraction
+- ~~Missing drift detection abstraction~~ ✅ **RESOLVED (ARCH-4)**
 - Alert service coupled to products
 - ~~Hardcoded business rules~~ ✅ **RESOLVED (ARCH-3)**
 - Alert suppression uses DB queries in hot path
 - Missing interface segregation
-- Duplicate drift/delay logic
+- ~~Duplicate drift/delay logic~~ ✅ **RESOLVED (ARCH-4)**
 
 ### API Design (11 issues)
 - ~~Missing pagination on custom actions~~ ✅ **RESOLVED**
@@ -1515,9 +1515,10 @@ Despite being essential for alert workflow, it had ZERO test coverage, creating 
 - Implement rollback strategy
 
 **Architecture**
-- Extract process_csv_upload to service layer
-- Remove wildcard imports
-- Create drift detection strategy pattern
+
+- ~~Extract process_csv_upload to service layer~~ ✅ **RESOLVED (HIGH-5)**
+- ~~Remove wildcard imports~~ ✅ **RESOLVED (HIGH-4)**
+- ~~Create drift detection strategy pattern~~ ✅ **RESOLVED (ARCH-4)**
 
 **DevOps**
 - ~~Add container scanning~~ ✅ **RESOLVED**
@@ -1603,15 +1604,15 @@ Despite being essential for alert workflow, it had ZERO test coverage, creating 
 
 ## Progress Tracking
 
-**Current Status**: Phase 2 - IN PROGRESS (Reviewing remaining items to complete) 🚧
+**Current Status**: Phase 2 - NEARLY COMPLETE (22/23 HIGH items resolved - 96%) 🚀
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 88 | 69.8% |
+| To Do | 87 | 69.0% |
 | In Progress | 0 | 0% |
-| Done | 38 | 30.2% |
+| Done | 39 | 31.0% |
 
 ### By Domain Completion
 
@@ -1620,7 +1621,7 @@ Despite being essential for alert workflow, it had ZERO test coverage, creating 
 | Security | 10 | 2 | 20.0% |
 | Performance | 18 | 11 | 61.1% |
 | Testing | 17 | 4 | 23.5% |
-| Architecture | 21 | 2 | 9.5% |
+| Architecture | 21 | 4 | 19.0% |
 | Database | 22 | 5 | 22.7% |
 | API | 21 | 4 | 19.0% |
 | DevOps | 27 | 10 | 37.0% |
@@ -1639,7 +1640,7 @@ Despite being essential for alert workflow, it had ZERO test coverage, creating 
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 - ✅ **CRIT-10**: No rollback strategy in deployments (cloudbuild.yaml, scripts/smoke_test.py)
 
-**Phase 2 - High Priority Issues (21/33 - 63.6%)** 🚧
+**Phase 2 - High Priority Issues (22/23 - 95.7%)** 🚀
 - ✅ **HIGH-1**: JWT token blacklist configuration (upstream/settings/base.py)
 - ✅ **HIGH-2**: Rate limiting on auth endpoints (upstream/api/throttling.py, views.py, urls.py)
 - ✅ **HIGH-3**: N+1 query in AlertEvent processing (upstream/products/delayguard/views.py)
@@ -1662,6 +1663,7 @@ Despite being essential for alert workflow, it had ZERO test coverage, creating 
 - ✅ **PERF-20**: Inefficient serializer method fields (upstream/api/views.py, serializers.py - annotate counts + use prefetched data, eliminated N+1 queries)
 - ✅ **TEST-1**: Missing tests for IngestionService (upstream/ingestion/tests.py - created 20 comprehensive tests covering idempotency, events, transactions, workflows)
 - ✅ **ARCH-3**: Hardcoded business rules (upstream/constants.py, upstream/products/delayguard/views.py, upstream/products/driftwatch/services.py - centralized DelayGuard urgency thresholds and processing time drift constants)
+- ✅ **ARCH-4**: Missing drift detection abstraction (upstream/services/base_drift_detection.py - created BaseDriftDetectionService abstract base class implementing Template Method + Strategy pattern for DriftWatch, DelayGuard, and DenialScope; provides common infrastructure for time window computation, statistical comparison, transaction management, event publishing, and result structuring; eliminates duplicate drift/delay logic across products)
 
 **Phase 2 Quick Wins (5 issues - 2026-01-26)** ⚡
 - ✅ **DEVOPS-1**: Linting doesn't block CI (.github/workflows/lint.yml - removed `|| true` from Ruff linter, now fails builds on code quality issues)
