@@ -1065,17 +1065,98 @@ class ErrorHandlingTests(APITestBase):
 
     def test_throttled_error_format(self):
         """Test that throttled requests return standardized format."""
-        # This test is tricky because we need to trigger rate limiting
-        # We'll skip detailed testing but verify the handler supports it
-        # The format is tested in the exception handler itself
-        pass
+        from unittest.mock import patch
+        from rest_framework.exceptions import Throttled
+
+        self.authenticate_as(self.user_a)
+
+        # Mock the dashboard view to raise a Throttled exception
+        with patch(
+            "upstream.api.views.DashboardView.get",
+            side_effect=Throttled(wait=60),
+        ):
+            response = self.client.get(f"{API_BASE}/dashboard/")
+
+            # Should return 429 with standardized error format
+            self.assertErrorFormat(response, "throttled", 429)
+            # Should include wait_seconds in details
+            self.assertIsNotNone(response.data["error"]["details"])
+            self.assertIn("wait_seconds", response.data["error"]["details"])
+            self.assertEqual(response.data["error"]["details"]["wait_seconds"], 60)
 
     def test_server_error_format(self):
         """Test that unexpected server errors return standardized format."""
-        # This is difficult to test without mocking, but we can verify
-        # the exception handler properly handles unknown exceptions
-        # The implementation in exceptions.py handles this case
-        pass
+        from unittest.mock import patch
+        from upstream.api.views import DashboardView
+
+        self.authenticate_as(self.user_a)
+
+        # Mock the dashboard view to raise an unexpected exception
+        with patch.object(
+            DashboardView,
+            "get",
+            side_effect=RuntimeError("Simulated server error"),
+        ):
+            response = self.client.get(f"{API_BASE}/dashboard/")
+
+            # Should return 500 with standardized error format
+            self.assertErrorFormat(response, "internal_server_error", 500)
+            self.assertIsNone(response.data["error"]["details"])
+
+    def test_django_http404_exception(self):
+        """Test that Django Http404 exceptions return standardized format."""
+        from unittest.mock import patch
+        from django.http import Http404
+
+        self.authenticate_as(self.user_a)
+
+        # Mock a view to raise Django's Http404
+        with patch(
+            "upstream.api.views.DashboardView.get",
+            side_effect=Http404("Resource not found"),
+        ):
+            response = self.client.get(f"{API_BASE}/dashboard/")
+
+            # Should return 404 with standardized error format
+            self.assertErrorFormat(response, "not_found", 404)
+            self.assertIsNone(response.data["error"]["details"])
+
+    def test_not_acceptable_error(self):
+        """Test that NotAcceptable errors return standardized format."""
+        from unittest.mock import patch
+        from rest_framework.exceptions import NotAcceptable
+
+        self.authenticate_as(self.user_a)
+
+        # Mock a view to raise NotAcceptable
+        with patch(
+            "upstream.api.views.DashboardView.get",
+            side_effect=NotAcceptable("Could not satisfy accept header"),
+        ):
+            response = self.client.get(f"{API_BASE}/dashboard/")
+
+            # Should return 406 with standardized error format
+            self.assertErrorFormat(response, "not_acceptable", 406)
+            self.assertIsNone(response.data["error"]["details"])
+
+    def test_not_found_with_detail_message(self):
+        """Test NotFound exception with custom detail message."""
+        from unittest.mock import patch
+        from rest_framework.exceptions import NotFound
+
+        self.authenticate_as(self.user_a)
+
+        # Mock a view to raise NotFound with custom message
+        with patch(
+            "upstream.api.views.DashboardView.get",
+            side_effect=NotFound("Custom not found message"),
+        ):
+            response = self.client.get(f"{API_BASE}/dashboard/")
+
+            # Should return 404 with standardized error format and details
+            self.assertErrorFormat(response, "not_found", 404)
+            self.assertIsNotNone(response.data["error"]["details"])
+            self.assertIn("detail", response.data["error"]["details"])
 
     def test_error_format_consistency(self):
         """Test that all error responses have consistent structure."""

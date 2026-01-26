@@ -1,0 +1,234 @@
+{
+  "company": {
+    "name": "Upstream",
+    "tagline": "Early-warning payer risk intelligence for specialty practices",
+    "positioning": "Prevention-focused payer behavior monitoring before claims are submitted"
+  },
+  "valueProposition": {
+    "primary": "Payment timing and denial pattern monitoring for specialty practices",
+    "secondary": "Built for nephrology groups, dental practices, family practices, ABA therapy clinics, and imaging centers (small to mid-size practices)",
+    "differentiator": "Leading indicator monitoring with payment timing detection - no EHR integration required"
+  },
+  "coreDifferentiators": [
+    "Payment timing monitoring (DelayGuard) - leading indicator that catches policy changes BEFORE denial rates spike",
+    "Trend analysis focuses on systemic patterns, not one-off noise",
+    "30-day implementation - EHR-independent data connection (CSV/clearinghouse)",
+    "Transparent fixed monthly pricing - no percentage of recovery",
+    "Specialty-focused roadmap: ABA auth tracking Q1 2026, nephrology/dental/family practice/imaging Q2 2026",
+    "No EHR vendor coordination required - works with any PM system"
+  ],
+  "pricing": {
+    "model": "Fixed monthly subscription",
+    "structure": "Transparent tiered pricing based on practice size",
+    "transparency": "High - pricing published and predictable",
+    "tiers": [
+      {
+        "name": "Small Practice",
+        "providers": "1-5",
+        "stations": "N/A",
+        "monthlyFee": "$1,500",
+        "includes": [
+          "DriftWatch behavioral monitoring",
+          "DenialScope analytics",
+          "Email and in-app alerts",
+          "Standard support"
+        ]
+      },
+      {
+        "name": "Medium Practice",
+        "providers": "6-20",
+        "stations": "5-15 dialysis stations",
+        "monthlyFee": "$3,500",
+        "includes": [
+          "All Small Practice features",
+          "Specialty-specific rules (nephrology, dentists, family practice, ABA, imaging)",
+          "Priority support",
+          "Quarterly business reviews"
+        ]
+      },
+      {
+        "name": "Large Practice/Multi-Site",
+        "providers": "20+",
+        "stations": "15+ dialysis stations",
+        "monthlyFee": "Custom pricing",
+        "includes": [
+          "All Medium Practice features",
+          "Multi-site management",
+          "Dedicated account manager",
+          "Custom rule configuration",
+          "API access"
+        ]
+      }
+    ],
+    "paymentTiming": "Monthly subscription - predictable budgeting",
+    "notes": [
+      "No percentage-based fees - fixed cost regardless of denial volume",
+      "No hidden costs or recovery-based pricing",
+      "Annual contracts available with discount"
+    ]
+  },
+  "features": {
+    "payerIntelligence": {
+      "paymentTimingMonitoring": {
+        "available": true,
+        "rating": 4,
+        "description": "DelayGuard monitors payment timing changes - payer slowdowns are leading indicators before denial rate changes",
+        "uniqueValue": "Payment timing drift (e.g., 45 days → 52 days) predicts payer policy changes"
+      },
+      "trendAnalysis": {
+        "available": true,
+        "rating": 4,
+        "description": "Trend analysis identifies systemic denial patterns, filtering out one-off issues",
+        "uniqueValue": "Focuses on actionable systemic trends rather than point-in-time noise"
+      },
+      "specialtySpecificRules": {
+        "available": false,
+        "rating": 2,
+        "description": "Specialty-specific features (dialysis MA variance, ABA auth tracking, dental D-codes) on product roadmap - not yet available",
+        "note": "Currently analyzes general denial patterns. Specialty features planned for Q2 2026.",
+        "plannedSpecialties": [
+          "Nephrology (dialysis ESRD PPS, CKD stage coding) - Q2 2026",
+          "Dental (D-code frequency limits, periodontal patterns) - Q2 2026",
+          "Family Practice (E&M coding shifts, preventive care patterns) - Q2 2026",
+          "ABA Therapy (authorization expiration tracking) - Q1 2026 priority",
+          "Imaging (prior auth approval rate tracking) - Q2 2026"
+        ]
+      },
+      "trendBasedAlerts": {
+        "available": true,
+        "rating": 4,
+        "description": "Trend analysis identifies systemic patterns, filtering out one-off issues",
+        "note": "Focuses on actionable systemic changes, not point-in-time noise"
+      }
+    },
+    "denialPrevention": {
+      "preSubmissionWarnings": {
+        "available": false,
+        "rating": 1,
+        "description": "Pre-submission risk scoring on roadmap - not currently available",
+        "note": "Current product analyzes post-submission outcomes weekly"
+      },
+      "denialScopeAnalytics": {
+        "available": true,
+        "rating": 5,
+        "description": "DenialScope™ dashboard shows denial trends, root causes, and prevention opportunities"
+      },
+      "actionableRecommendations": {
+        "available": true,
+        "rating": 5,
+        "description": "Specific recommendations on how to adjust coding, documentation, or workflows to prevent denials"
+      }
+    },
+    "integrations": {
+      "ehrSystems": {
+        "available": true,
+        "rating": 4,
+        "description": "Works with any EHR - connects via data feeds, not limited to specific platforms",
+        "note": "EHR-agnostic approach allows faster implementation and flexibility",
+        "supportedConnections": [
+          "Direct data feeds from clearinghouses",
+          "CSV/Excel uploads",
+          "API connections (custom)",
+          "CRM integrations",
+          "Workflow tool integrations (email, Slack, etc.)"
+        ]
+      },
+      "clearinghouseIntegration": {
+        "available": true,
+        "rating": 4,
+        "description": "Connects to major clearinghouses for claims data access"
+      },
+      "independentDeployment": {
+        "available": true,
+        "rating": 5,
+        "description": "No EHR vendor coordination required - independent data connection"
+      }
+    },
+    "implementation": {
+      "estimatedTimeline": "30 days",
+      "ehrDependency": "None - EHR-independent",
+      "setupComplexity": "Low - data connection + specialty rule configuration",
+      "dataConnectionMethod": "Clearinghouse feed, CSV upload, or API",
+      "trainingRequired": "1 day onboarding session",
+      "fastTrackAvailable": "Yes - can be live in 2 weeks for urgent needs"
+    },
+    "support": {
+      "customerSupport": "Email, phone, and in-app chat during business hours",
+      "implementationSupport": "Dedicated onboarding specialist for 30-day implementation",
+      "accountManagement": "Quarterly business reviews for all customers (not just enterprise)",
+      "technicalSupport": "Direct access to product team for specialty-specific questions",
+      "specialtyExpertise": "In-house experts in nephrology/dialysis, dental billing, family practice, ABA therapy, and imaging center billing"
+    }
+  },
+  "strengths": [
+    "Leading indicator monitoring - payment timing (DelayGuard) detects policy changes BEFORE denial rates spike",
+    "Trend analysis focuses on actionable systemic patterns, not point-in-time noise",
+    "30-day implementation (vs. 3-6 months for EHR-integrated solutions)",
+    "Transparent fixed monthly pricing (no percentage of recovery)",
+    "EHR-independent (no vendor coordination, works with any PM system)",
+    "Specialty-focused roadmap for small to mid-size practices: ABA Q1 2026, nephrology/dental/family practice/imaging Q2 2026",
+    "Quarterly business reviews for all customers (not just enterprise)"
+  ],
+  "weaknesses": [
+    "Not embedded in EHR workflows (separate login required)",
+    "Specialty-specific features rolling out Q1-Q2 2026 (ABA auth tracking Q1, others Q2)",
+    "Best fit for small-to-mid size practices (small to mid-size practices) rather than large enterprise health systems",
+    "Newer product - less market presence than established RCM vendors"
+  ],
+  "targetSegments": [
+    "Nephrology groups (small to mid-size practices) managing dialysis ESRD PPS, CKD coding, and vascular access billing",
+    "Dental practices (small to mid-size practices) tracking D-code frequency limits and periodontal maintenance patterns",
+    "Family practice groups (small to mid-size practices) monitoring E&M coding shifts and preventive care denial trends",
+    "ABA therapy clinics (small to mid-size practices) managing authorization expirations and session limits",
+    "Imaging centers (small to mid-size practices, outpatient radiology/MRI/CT) tracking prior authorization pattern shifts"
+  ],
+  "implementationProcess": [
+    {
+      "phase": "Week 1: Kickoff & Data Connection",
+      "activities": [
+        "Initial kickoff call with onboarding specialist",
+        "Connect data feed from clearinghouse or set up CSV upload",
+        "Verify data quality and historical claims visibility"
+      ]
+    },
+    {
+      "phase": "Week 2-3: Configuration & Specialty Rules Setup",
+      "activities": [
+        "Configure specialty-specific rules (nephrology/dialysis, dental D-codes, family practice E&M, ABA auth, imaging prior auth)",
+        "Set alert thresholds based on practice's denial tolerance",
+        "Train staff on DriftWatch and DenialScope dashboards"
+      ]
+    },
+    {
+      "phase": "Week 4: Testing & Launch",
+      "activities": [
+        "Test alert delivery (email, in-app, Slack integration if desired)",
+        "Review first batch of early-warning alerts",
+        "Go live with production monitoring"
+      ]
+    },
+    {
+      "phase": "Ongoing: Support & Optimization",
+      "activities": [
+        "Quarterly business reviews to refine alert rules",
+        "Monitor denial rate improvements",
+        "Adjust specialty-specific configurations as payers change policies"
+      ]
+    }
+  ],
+  "supportModel": {
+    "onboarding": "Dedicated specialist for 30 days",
+    "ongoing": "Email, phone, in-app chat during business hours",
+    "quarterlyReviews": "All customers (not just enterprise)",
+    "specialtyExpertise": "Direct access to nephrology/dialysis, dental, family practice, ABA, and imaging billing experts",
+    "responseTime": "4-hour SLA for critical alerts, 24-hour for general inquiries"
+  },
+  "competitivePositioning": {
+    "vsAdonisIntelligence": "Early-warning prevention vs. real-time reactive alerts; specialty-specific vs. general; 30-day implementation vs. 3-6 months EHR integration",
+    "vsRivetHealth": "Behavioral drift detection vs. contract benchmarking; denial prevention vs. underpayment detection",
+    "vsMDClarity": "Proactive payer intelligence vs. retrospective underpayment analysis",
+    "vsInfinx": "Prevention vs. recovery; early-warning vs. A/R follow-up",
+    "vsEnterpriseRCM": "Specialty-focused vs. enterprise generalist; fast implementation vs. lengthy EHR projects"
+  },
+  "lastUpdated": "2026-01-26"
+}

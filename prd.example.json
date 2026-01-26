@@ -1,0 +1,30 @@
+{
+  "branchName": "ralph/example-feature",
+  "userStories": [
+    {
+      "id": 1,
+      "title": "Add database model for the new feature",
+      "passes": false
+    },
+    {
+      "id": 2,
+      "title": "Create serializer for the model",
+      "passes": false
+    },
+    {
+      "id": 3,
+      "title": "Implement ViewSet with list and retrieve actions",
+      "passes": false
+    },
+    {
+      "id": 4,
+      "title": "Register ViewSet in urls.py",
+      "passes": false
+    },
+    {
+      "id": 5,
+      "title": "Write API tests for all endpoints",
+      "passes": false
+    }
+  ]
+}

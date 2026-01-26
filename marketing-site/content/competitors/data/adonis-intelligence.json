@@ -1,0 +1,172 @@
+{
+  "company": {
+    "name": "Adonis Intelligence",
+    "founded": "2018",
+    "headquarters": "New York, NY",
+    "website": "https://www.adonis.com",
+    "tagline": "Real-time payer intelligence for revenue cycle optimization"
+  },
+  "positioning": {
+    "primaryFocus": "Real-time alerts on submitted claims to detect and recover denials",
+    "targetMarket": [
+      "General specialty practices",
+      "Multi-specialty groups",
+      "Practices using athenahealth, AdvancedMD, or eClinicalWorks"
+    ],
+    "valueProposition": "Embedded EHR intelligence that alerts you to payer behavior changes the moment claims are submitted"
+  },
+  "pricing": {
+    "model": "ROI-based percentage of recovery",
+    "structure": "Variable percentage of denied claims recovered",
+    "transparency": "Low - pricing not publicly disclosed, varies by customer",
+    "typicalRange": "Percentage-based on recovered revenue",
+    "paymentTiming": "Monthly billing based on recovery performance",
+    "notes": [
+      "No transparent fixed pricing",
+      "Costs scale with denial volume",
+      "ROI-dependent model can be unpredictable for budgeting"
+    ]
+  },
+  "features": {
+    "payerIntelligence": {
+      "realTimeAlerts": {
+        "available": true,
+        "rating": 5,
+        "description": "Alerts trigger when claims are submitted and payer behavior changes detected"
+      },
+      "earlyWarningDetection": {
+        "available": false,
+        "rating": 2,
+        "description": "Limited proactive detection - primarily reactive to submitted claims"
+      },
+      "behavioralDriftTracking": {
+        "available": false,
+        "rating": 2,
+        "description": "Focuses on claim-level alerts, not longitudinal behavioral trends"
+      },
+      "specialtySpecificRules": {
+        "available": false,
+        "rating": 2,
+        "description": "General rules across specialties, not tailored for dialysis/ABA/imaging/home health"
+      }
+    },
+    "denialPrevention": {
+      "preSubmissionWarnings": {
+        "available": false,
+        "rating": 1,
+        "description": "Alerts occur after submission, not before"
+      },
+      "editValidation": {
+        "available": true,
+        "rating": 4,
+        "description": "EHR-embedded edit checking at time of claim creation"
+      },
+      "claimScrubbingIntegration": {
+        "available": true,
+        "rating": 4,
+        "description": "Integrates with EHR scrubbing engines"
+      }
+    },
+    "integrations": {
+      "ehrSystems": {
+        "available": true,
+        "rating": 5,
+        "description": "Deep integrations with athenahealth, AdvancedMD, eClinicalWorks",
+        "supportedSystems": [
+          "athenahealth",
+          "AdvancedMD",
+          "eClinicalWorks",
+          "Select other EHRs"
+        ]
+      },
+      "pmsSystems": {
+        "available": true,
+        "rating": 4,
+        "description": "Works within EHR PM modules"
+      },
+      "clearinghouseIntegration": {
+        "available": true,
+        "rating": 4,
+        "description": "Integrates with major clearinghouses for claim tracking"
+      }
+    },
+    "implementation": {
+      "estimatedTimeline": "3-6 months (EHR-dependent)",
+      "ehrDependency": "High - requires full EHR integration",
+      "setupComplexity": "High - IT resources and EHR vendor coordination required",
+      "dataConnectionMethod": "EHR API or direct database access",
+      "trainingRequired": "2-3 days for staff"
+    },
+    "support": {
+      "customerSupport": "Standard business hours support",
+      "implementationSupport": "Dedicated onboarding team",
+      "accountManagement": "Quarterly business reviews for enterprise customers",
+      "technicalSupport": "Ticketing system, email, phone"
+    }
+  },
+  "strengths": [
+    "Deep EHR integrations with major platforms (athenahealth, AdvancedMD, eCW)",
+    "Real-time alerts at point of claim submission",
+    "Embedded in existing PM workflows - no separate login",
+    "Established player with proven case studies (104% PT denial spike detection)",
+    "Strong for practices already on supported EHR platforms"
+  ],
+  "weaknesses": [
+    "EHR-dependent implementation creates 3-6 month delays",
+    "Pricing opacity - percentage of recovery model not transparent",
+    "Limited specialty-specific intelligence (no dialysis ESRD PPS, ABA auth tracking, etc.)",
+    "Reactive alerts AFTER submission - prevention happens at scrubbing, not behavioral drift detection",
+    "High implementation complexity requiring IT resources and EHR vendor coordination",
+    "Not ideal for practices with unsupported EHRs or custom PM systems"
+  ],
+  "bestFor": [
+    "Practices already using athenahealth, AdvancedMD, or eClinicalWorks",
+    "General specialty practices (not high-complexity verticals like dialysis/ABA)",
+    "Organizations preferring EHR-embedded solutions over standalone tools",
+    "Practices with IT resources to support 3-6 month EHR integration projects"
+  ],
+  "notIdealFor": [
+    "Specialty practices needing dialysis-specific (ESRD PPS), ABA-specific (auth tracking), imaging-specific, or home health-specific intelligence",
+    "Practices needing fast implementation (under 60 days)",
+    "Organizations requiring transparent fixed pricing for budgeting",
+    "Practices wanting prevention BEFORE submission, not just alerts after",
+    "Practices on unsupported EHR platforms"
+  ],
+  "customerComplaints": [
+    "Long implementation timelines due to EHR integration dependencies",
+    "Difficulty budgeting due to variable percentage-based pricing",
+    "Alerts can be noisy - many false positives requiring manual triage",
+    "Limited specialty-specific customization for niche verticals",
+    "EHR integration issues can block upgrades or changes to PM workflows"
+  ],
+  "migrationToUpstream": {
+    "difficulty": "Low - Adonis and Upstream can run in parallel",
+    "timeline": "30 days for Upstream implementation (independent of Adonis)",
+    "dataTransfer": "No direct data migration needed - fresh start with Upstream's behavioral analysis",
+    "whatTransfers": [],
+    "whatDoesntTransfer": [
+      "Historical alert configurations",
+      "EHR integration settings",
+      "Custom workflows"
+    ],
+    "supportOffered": "Upstream provides dedicated onboarding to configure specialty-specific rules from day one"
+  },
+  "caseStudies": [
+    {
+      "title": "Physical Therapy Practice - 104% Denial Spike Detection",
+      "specialty": "Physical Therapy",
+      "challenge": "Sudden denial rate increase went undetected",
+      "solution": "Adonis real-time alerts flagged 104% spike in PT denials",
+      "outcome": "Practice recovered revenue and adjusted coding practices"
+    }
+  ],
+  "competitiveIntelligence": {
+    "lastUpdated": "2026-01-26",
+    "sources": [
+      "Adonis website and public materials",
+      "G2 and Capterra reviews",
+      "Sales conversations with prospects evaluating both Adonis and Upstream",
+      "Industry analyst reports on RCM technology"
+    ]
+  }
+}
