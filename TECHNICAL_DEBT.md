@@ -253,20 +253,23 @@ aggregates_qs = base_qs.values(
 
 ---
 
-### CRIT-7: Missing Tests for DataQualityService
+### ~~CRIT-7: Missing Tests for DataQualityService~~ ✅ RESOLVED
 **Domain**: Test Quality
 **File**: upstream/core/data_quality_service.py:1-150
 **Impact**: HIPAA-critical PHI detection untested
 **Effort**: Large
+**Status**: ✅ Fixed on 2026-01-26
 
-**Description**: Critical validation logic including PHI detection, date validation, anomaly detection has NO test coverage.
+**Problem**: Critical validation logic including PHI detection, date validation, anomaly detection had NO test coverage.
 
-**Fix**: Create tests_data_quality.py with comprehensive coverage:
-- PHI detection positive/negative cases
-- Each validation rule type
-- Anomaly detection edge cases
-- Quality report metrics
-- Atomic rollback on errors
+**Resolution**: Created `upstream/core/tests_data_quality.py` with 42 comprehensive tests:
+- **PHI Detection (6 tests)**: SSN, MRN, Phone patterns with positive/negative cases
+- **Validation Rules (21 tests)**: Required fields, format, range, date logic, reference data, business rules
+- **Anomaly Detection (9 tests)**: Volume (z-score), missing data spike, distribution shift with edge cases
+- **Quality Metrics (3 tests)**: Completeness, validity, timeliness calculations
+- **Integration Tests (3 tests)**: Full workflow, error tracking, atomic transaction rollback
+
+**Impact**: All HIPAA-critical validation logic now covered, ensuring PHI redaction, audit trail, and compliance
 
 ---
 
