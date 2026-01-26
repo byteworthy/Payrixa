@@ -113,6 +113,29 @@ class Upload(models.Model):
                 condition=models.Q(file_hash__isnull=False),
                 name="upload_unique_file_hash_per_customer",
             ),
+            # CHECK constraints for data integrity (Phase 3 Task #3)
+            models.CheckConstraint(
+                check=models.Q(row_count__gte=0) | models.Q(row_count__isnull=True),
+                name="upload_row_count_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(accepted_row_count__gte=0),
+                name="upload_accepted_count_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(rejected_row_count__gte=0),
+                name="upload_rejected_count_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(warning_row_count__gte=0),
+                name="upload_warning_count_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(date_min__lte=models.F("date_max"))
+                | models.Q(date_min__isnull=True)
+                | models.Q(date_max__isnull=True),
+                name="upload_date_range_logical",
+            ),
         ]
         indexes = [
             models.Index(
@@ -220,6 +243,42 @@ class DataQualityReport(models.Model):
     all_objects = models.Manager()  # Unfiltered access for superusers
 
     class Meta:
+        constraints = [
+            # CHECK constraints for data integrity (Phase 3 Task #3)
+            models.CheckConstraint(
+                check=models.Q(total_rows__gte=0), name="dqr_total_rows_nonnegative"
+            ),
+            models.CheckConstraint(
+                check=models.Q(accepted_rows__gte=0), name="dqr_accepted_rows_nonnegative"
+            ),
+            models.CheckConstraint(
+                check=models.Q(rejected_rows__gte=0), name="dqr_rejected_rows_nonnegative"
+            ),
+            models.CheckConstraint(
+                check=models.Q(phi_detections__gte=0),
+                name="dqr_phi_detections_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(missing_fields__gte=0),
+                name="dqr_missing_fields_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(invalid_dates__gte=0),
+                name="dqr_invalid_dates_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(invalid_values__gte=0),
+                name="dqr_invalid_values_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(accepted_rows__lte=models.F("total_rows")),
+                name="dqr_accepted_lte_total",
+            ),
+            models.CheckConstraint(
+                check=models.Q(rejected_rows__lte=models.F("total_rows")),
+                name="dqr_rejected_lte_total",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["customer", "-created_at"], name="dqr_cust_created_idx"
@@ -395,6 +454,35 @@ class ClaimRecord(models.Model):
                 fields=["customer", "upload", "source_data_hash"],
                 condition=models.Q(source_data_hash__isnull=False),
                 name="claim_unique_source_hash_per_upload",
+            ),
+            # CHECK constraints for data integrity (Phase 3 Task #3)
+            models.CheckConstraint(
+                check=models.Q(data_quality_score__gte=0.0)
+                & models.Q(data_quality_score__lte=1.0)
+                | models.Q(data_quality_score__isnull=True),
+                name="claim_quality_score_range",
+            ),
+            models.CheckConstraint(
+                check=models.Q(procedure_count__gte=1),
+                name="claim_procedure_count_positive",
+            ),
+            models.CheckConstraint(
+                check=models.Q(allowed_amount__gte=0)
+                | models.Q(allowed_amount__isnull=True),
+                name="claim_allowed_amount_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(billed_amount__gte=0)
+                | models.Q(billed_amount__isnull=True),
+                name="claim_billed_amount_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(paid_amount__gte=0) | models.Q(paid_amount__isnull=True),
+                name="claim_paid_amount_nonnegative",
+            ),
+            models.CheckConstraint(
+                check=models.Q(submitted_date__lte=models.F("decided_date")),
+                name="claim_dates_logical_order",
             ),
         ]
         indexes = [
@@ -641,6 +729,23 @@ class DriftEvent(models.Model):
     all_objects = models.Manager()  # Unfiltered access for superusers
 
     class Meta:
+        constraints = [
+            # CHECK constraints for data integrity (Phase 3 Task #3)
+            models.CheckConstraint(
+                check=models.Q(severity__gte=0.0) & models.Q(severity__lte=1.0),
+                name="drift_severity_range",
+            ),
+            models.CheckConstraint(
+                check=models.Q(confidence__gte=0.0) & models.Q(confidence__lte=1.0),
+                name="drift_confidence_range",
+            ),
+            models.CheckConstraint(
+                check=models.Q(statistical_significance__gte=0.0)
+                & models.Q(statistical_significance__lte=1.0)
+                | models.Q(statistical_significance__isnull=True),
+                name="drift_significance_range",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["customer", "-created_at"], name="drift_cust_created_idx"
