@@ -320,8 +320,13 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         queryset = super().get_queryset()
         # HIGH-13: Add select_related to avoid N+1 queries
         # UploadSerializer includes 'customer' field, so prefetch it for detail views
+        # PERF-03: Add select_related for list views to optimize N+1 queries
+        # Story #3: Upload list view loads customer and uploaded_by for each upload
         if self.action in ("retrieve", "update", "partial_update"):
             queryset = queryset.select_related("customer")
+        elif self.action == "list":
+            # Optimize list view: load customer and uploaded_by in single query
+            queryset = queryset.select_related("customer", "uploaded_by")
         return queryset
 
     def get_serializer_class(self):
@@ -465,7 +470,11 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 
         # HIGH-13: Add select_related to avoid N+1 queries
         # ClaimRecordSerializer includes 'customer' and 'upload' fields
+        # PERF-04: Story #4 - Optimize list and retrieve views with select_related
         if self.action == "retrieve":
+            queryset = queryset.select_related("customer", "upload")
+        elif self.action == "list":
+            # Optimize list view: load customer and upload in single query
             queryset = queryset.select_related("customer", "upload")
 
         return queryset
