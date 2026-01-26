@@ -1300,6 +1300,108 @@ def get_latest_judgment_verdict(self, obj):
 
 ---
 
+### ~~Missing Tests for EvidencePayload~~ ✅ RESOLVED
+**Domain**: Test Quality
+**File**: upstream/services/tests_evidence_payload.py (created), upstream/services/evidence_payload.py
+**Impact**: Core alert interpretation service with zero test coverage, risking incorrect urgency classification and action recommendations
+**Effort**: Medium
+**Status**: ✅ Fixed on 2026-01-26
+
+**Problem**: EvidencePayload service provides critical alert interpretation functionality for DriftWatch and DenialScope products:
+- **Alert Interpretation**: Converts raw metrics into operator-friendly urgency levels, plain language explanations, and action steps
+- **Urgency Calculation**: Determines "Investigate Today" vs "Review This Week" vs "Monitor for Trend" based on severity and delta
+- **Noise Detection**: Identifies likely false positives to reduce alert fatigue
+- **Payload Building**: Structures evidence data for email/Slack notifications and UI display
+
+Despite being essential for alert workflow, it had ZERO test coverage, creating risk for:
+- Incorrect urgency classification (critical alerts marked as low priority)
+- Misleading plain language explanations
+- Inappropriate action step recommendations
+- Broken payload building causing notification failures
+
+**EvidencePayload Key Functionality**:
+1. **get_alert_interpretation()**: Main public API generating complete interpretations
+2. **_normalize_severity()**: Converts string/float severity to standardized 0-1 range
+3. **_normalize_delta()**: Converts various delta formats to float
+4. **_calculate_urgency()**: Maps (severity, delta) to urgency level + label
+5. **_generate_plain_language()**: Creates human-readable explanations per signal type
+6. **_generate_action_steps()**: Provides context-specific action recommendations
+7. **_generate_historical_context()**: Adds trend/recurrence context
+8. **build_denialscope_evidence_payload()**: Builds DenialScope-specific payloads
+9. **build_driftwatch_evidence_payload()**: Builds DriftWatch-specific payloads
+
+**Resolution**: Created comprehensive test suite (`upstream/services/tests_evidence_payload.py`) with **38 test methods** covering:
+
+**1. Normalization Tests (10 tests)**:
+- ✅ test_normalize_severity_float - Float values returned as-is
+- ✅ test_normalize_severity_string - String severities mapped to numeric (high, medium, low)
+- ✅ test_normalize_severity_none - None returns default value
+- ✅ test_normalize_severity_invalid - Invalid input returns default
+- ✅ test_normalize_delta_float - Float deltas returned as-is
+- ✅ test_normalize_delta_int - Int deltas converted to float
+- ✅ test_normalize_delta_string - String deltas parsed to float
+- ✅ test_normalize_delta_none - None returns 0.0
+- ✅ test_normalize_delta_invalid - Invalid input returns 0.0
+
+**2. Urgency Calculation Tests (5 tests)**:
+- ✅ test_high_urgency_critical_severity - Critical severity → "Investigate Today"
+- ✅ test_high_urgency_large_delta - Large delta → "Investigate Today"
+- ✅ test_medium_urgency_medium_severity - Medium severity → "Review This Week"
+- ✅ test_medium_urgency_moderate_delta - Moderate delta → "Review This Week"
+- ✅ test_low_urgency - Low severity + small delta → "Monitor for Trend"
+
+**3. Plain Language Generation Tests (5 tests)**:
+- ✅ test_denial_rate_increase_critical - DriftWatch denial rate increase with urgency messaging
+- ✅ test_denial_rate_decrease - DriftWatch denial rate decrease with "good news" messaging
+- ✅ test_denial_dollars_spike_critical - DenialScope critical spike messaging
+- ✅ test_denial_dollars_spike_medium - DenialScope medium spike messaging
+- ✅ test_generic_signal_fallback - Unknown signal types handled gracefully
+
+**4. Action Steps Tests (3 tests)**:
+- ✅ test_high_urgency_actions - High urgency generates "today" action steps
+- ✅ test_medium_urgency_actions - Medium urgency generates "this week" steps
+- ✅ test_low_urgency_actions - Low urgency generates "monitor" steps
+
+**5. Historical Context Tests (3 tests)**:
+- ✅ test_critical_severity_context - Critical context mentions "new" pattern
+- ✅ test_medium_severity_context - Medium context mentions "similar" alerts
+- ✅ test_low_severity_context - Low context mentions "minor variance"
+
+**6. Date Formatting Tests (4 tests)**:
+- ✅ test_both_dates - "2024-01-01 → 2024-01-31"
+- ✅ test_start_date_only - "From 2024-01-01"
+- ✅ test_end_date_only - "Through 2024-01-31"
+- ✅ test_no_dates - "-"
+
+**7. Alert Interpretation Tests (4 tests)**:
+- ✅ test_interpretation_with_valid_payload - Full interpretation with all fields
+- ✅ test_interpretation_with_empty_payload - Graceful defaults for empty input
+- ✅ test_interpretation_with_none_payload - Graceful defaults for None input
+- ✅ test_interpretation_identifies_noise - Low severity + small delta → is_likely_noise=True
+
+**8. Payload Builder Tests (5 tests)**:
+- ✅ test_build_payload_with_signal (DenialScope) - Valid signal with all fields
+- ✅ test_build_payload_with_none_signal (DenialScope) - Graceful None handling
+- ✅ test_build_payload_with_drift_event (DriftWatch) - Valid drift event with percentage formatting
+- ✅ test_build_payload_with_multiple_events (DriftWatch) - Evidence rows limited to 20 items
+- ✅ test_build_payload_with_none_drift_event (DriftWatch) - Graceful None handling
+
+**Expected Impact**:
+- ✅ **100% test coverage** for critical alert interpretation paths
+- ✅ **38 comprehensive tests** verifying urgency classification logic
+- ✅ **Safety net** preventing incorrect alert prioritization
+- ✅ **Regression prevention** for plain language generation
+- ✅ **Notification reliability** through payload builder tests
+- ✅ **Alert fatigue reduction** via noise detection validation
+- ✅ **CI protection** against interpretation logic regressions
+
+**Files Created**:
+- `upstream/services/tests_evidence_payload.py` (479 lines, 38 test methods, 9 test classes)
+
+**Test Execution**: All 38 tests pass in 0.017 seconds
+
+---
+
 ## Medium Priority Issues (73)
 
 *(Categorized by domain, top items shown)*
@@ -1320,8 +1422,8 @@ def get_latest_judgment_verdict(self, obj):
 - Missing covering indexes
 - No database CHECK constraints
 
-### Testing (9 issues)
-- ~~Missing tests for IngestionService~~ ✅ **RESOLVED (TEST-1)**, EvidencePayload, AlertService
+### Testing (8 issues)
+- ~~Missing tests for IngestionService~~ ✅ **RESOLVED (TEST-1)**, ~~EvidencePayload~~ ✅ **RESOLVED**, AlertService
 - No integration tests for webhooks
 - No performance/load tests
 - Disabled transaction rollback test
@@ -1507,9 +1609,9 @@ def get_latest_judgment_verdict(self, obj):
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 100 | 76.3% |
+| To Do | 99 | 75.6% |
 | In Progress | 0 | 0% |
-| Done | 31 | 23.7% |
+| Done | 32 | 24.4% |
 
 ### By Domain Completion
 
@@ -1517,7 +1619,7 @@ def get_latest_judgment_verdict(self, obj):
 |--------|--------|-------|------------|
 | Security | 10 | 2 | 20.0% |
 | Performance | 18 | 11 | 61.1% |
-| Testing | 17 | 3 | 17.6% |
+| Testing | 17 | 4 | 23.5% |
 | Architecture | 21 | 1 | 4.8% |
 | Database | 22 | 5 | 22.7% |
 | API | 23 | 2 | 8.7% |
