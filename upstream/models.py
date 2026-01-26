@@ -250,8 +250,10 @@ class ClaimRecord(models.Model):
     customer = models.ForeignKey(
         Customer, on_delete=models.CASCADE, related_name="claim_records"
     )
+    # CRIT-8: Changed from CASCADE to PROTECT to preserve audit trail
+    # Prevents deletion of Upload if ClaimRecords exist (HIPAA compliance)
     upload = models.ForeignKey(
-        Upload, on_delete=models.CASCADE, related_name="claim_records"
+        Upload, on_delete=models.PROTECT, related_name="claim_records"
     )
     # CRIT-3: Changed from TextField to CharField with indexes for query performance
     payer = models.CharField(

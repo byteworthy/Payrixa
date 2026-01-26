@@ -270,18 +270,29 @@ aggregates_qs = base_qs.values(
 
 ---
 
-### CRIT-8: Dangerous CASCADE Delete on Upload
+### ~~CRIT-8: Dangerous CASCADE Delete on Upload~~ ✅ RESOLVED
 **Domain**: Database
-**File**: upstream/models.py:230
+**File**: upstream/models.py:253-257
 **Impact**: HIPAA audit trail violation
 **Effort**: Medium
+**Status**: ✅ Fixed on 2026-01-26
 
 **Description**: Deleting Upload cascades to ClaimRecords, breaking audit trail.
 
-**Fix**:
+**Fix Applied**:
 ```python
+# Changed from CASCADE to PROTECT to preserve audit trail
+# Prevents deletion of Upload if ClaimRecords exist (HIPAA compliance)
 upload = models.ForeignKey(Upload, on_delete=models.PROTECT, related_name='claim_records')
 ```
+
+**Resolution**:
+- Changed ClaimRecord.upload field from `on_delete=models.CASCADE` to `on_delete=models.PROTECT`
+- Prevents accidental deletion of Upload records that have associated ClaimRecords
+- Maintains HIPAA-required audit trail for all uploaded claim data
+- Migration: `0004_protect_upload_audit_trail_crit8.py`
+- **Impact**: Critical HIPAA compliance fix - uploads with claims cannot be deleted
+- **Behavior Change**: Attempting to delete Upload with ClaimRecords will raise ProtectedError
 
 ---
 
@@ -629,15 +640,15 @@ Run: `python manage.py migrate token_blacklist`
 
 ## Progress Tracking
 
-**Current Status**: Phase 1 - In Progress (7/10 Critical Issues Resolved - 70%)
+**Current Status**: Phase 1 - In Progress (8/10 Critical Issues Resolved - 80%)
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 124 | 94.7% |
+| To Do | 123 | 93.9% |
 | In Progress | 0 | 0% |
-| Done | 7 | 5.3% |
+| Done | 8 | 6.1% |
 
 ### By Domain Completion
 
@@ -647,7 +658,7 @@ Run: `python manage.py migrate token_blacklist`
 | Performance | 18 | 3 | 16.7% |
 | Testing | 17 | 0 | 0% |
 | Architecture | 21 | 0 | 0% |
-| Database | 22 | 1 | 4.5% |
+| Database | 22 | 2 | 9.1% |
 | API | 23 | 0 | 0% |
 | DevOps | 30 | 3 | 10% |
 
@@ -658,6 +669,7 @@ Run: `python manage.py migrate token_blacklist`
 - ✅ **CRIT-4**: N+1 query in drift computation (upstream/services/payer_drift.py)
 - ✅ **CRIT-5**: DenialScope Python iteration to DB aggregation (upstream/products/denialscope/services.py)
 - ✅ **CRIT-6**: DelayGuard memory-intensive computation (upstream/products/delayguard/services.py)
+- ✅ **CRIT-8**: CASCADE delete on Upload breaking audit trail (upstream/models.py)
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 
 ---
