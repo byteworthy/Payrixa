@@ -72,6 +72,11 @@ class AlertRule(BaseModel):
         verbose_name = "Alert Rule"
         verbose_name_plural = "Alert Rules"
         unique_together = ("customer", "name")
+        indexes = [
+            models.Index(
+                fields=["customer", "enabled"], name="idx_alertrule_customer_enabled"
+            ),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.severity})"
