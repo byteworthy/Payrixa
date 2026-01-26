@@ -13,10 +13,11 @@ Phase 3 delivers production-ready database performance and API reliability throu
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Transaction Isolation & Unique Constraints** - Database correctness foundation
-- [ ] **Phase 2: API Pagination & Filtering** - List endpoint usability
+- [x] **Phase 2: API Pagination & Filtering** - List endpoint usability
 - [ ] **Phase 3: OpenAPI Documentation & Error Standardization** - API developer experience
 - [ ] **Phase 4: Webhook & RBAC Testing** - Integration test coverage
 - [ ] **Phase 5: Performance Testing & Rollback Fix** - Production reliability validation
+- [ ] **Phase 6: Database Indexes** - Query performance optimization
 
 ## Phase Details
 
@@ -34,6 +35,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Add transaction isolation with select_for_update() to drift detection
 - [x] 01-02-PLAN.md — Implement unique constraints via three-phase migrations
+
+**Completed:** 2026-01-26
 
 ### Phase 2: API Pagination & Filtering
 **Goal**: All API list endpoints support pagination and user-driven filtering for large datasets
@@ -97,15 +100,30 @@ Plans:
 - [ ] 05-01-PLAN.md — Create Locust performance test suite and CI integration
 - [ ] 05-02-PLAN.md — Create deployment rollback test and workflow integration
 
+### Phase 6: Database Indexes
+**Goal**: Add missing database indexes to improve query performance for webhook retry logic, alert rule evaluation, and user profile lookups
+**Depends on**: Phase 1 (complements database work)
+**Requirements**: DB-03 (implicit - query performance optimization)
+**Success Criteria** (what must be TRUE):
+  1. Webhook retry queries use indexes instead of full table scans
+  2. Alert rule evaluation queries use indexes for enabled+customer filters
+  3. User profile lookups use indexes for foreign key relationships
+  4. Integration log queries use indexes for connection history and status monitoring
+**Plans**: 1 plan
+
+Plans:
+- [ ] 06-01-PLAN.md — Add indexes to UserProfile, AlertRule, NotificationChannel, WebhookDelivery, IntegrationLog models
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Transaction Isolation & Unique Constraints | 2/2 | Complete | 2026-01-26 |
-| 2. API Pagination & Filtering | 0/2 | Not started | - |
+| 2. API Pagination & Filtering | 2/2 | Complete | 2026-01-26 |
 | 3. OpenAPI Documentation & Error Standardization | 0/TBD | Not started | - |
 | 4. Webhook & RBAC Testing | 0/2 | Not started | - |
 | 5. Performance Testing & Rollback Fix | 0/2 | Not started | - |
+| 6. Database Indexes | 0/1 | Not started | - |
