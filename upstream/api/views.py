@@ -153,6 +153,15 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["uploaded_at", "status", "row_count"]
 
+    def get_queryset(self):
+        """Optimize queryset with select_related for detail views."""
+        queryset = super().get_queryset()
+        # HIGH-13: Add select_related to avoid N+1 queries
+        # UploadSerializer includes 'customer' field, so prefetch it for detail views
+        if self.action in ("retrieve", "update", "partial_update"):
+            queryset = queryset.select_related("customer")
+        return queryset
+
     def get_serializer_class(self):
         if self.action == "list":
             return UploadSummarySerializer
@@ -195,6 +204,11 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+
+        # HIGH-13: Add select_related to avoid N+1 queries
+        # ClaimRecordSerializer includes 'customer' and 'upload' fields
+        if self.action == "retrieve":
+            queryset = queryset.select_related("customer", "upload")
 
         # Filter by payer
         payer = self.request.query_params.get("payer")

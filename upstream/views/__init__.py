@@ -175,9 +175,12 @@ class UploadsView(LoginRequiredMixin, PermissionRequiredMixin, View):
     def get(self, request):
         try:
             customer = get_current_customer(request)
-            uploads = Upload.objects.filter(customer=customer).order_by("-uploaded_at")[
-                :10
-            ]
+            # HIGH-13: Add select_related to avoid N+1 queries in template
+            uploads = (
+                Upload.objects.filter(customer=customer)
+                .select_related("customer")
+                .order_by("-uploaded_at")[:10]
+            )
             return render(
                 request, self.template_name, {"customer": customer, "uploads": uploads}
             )
