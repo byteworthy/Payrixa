@@ -57,8 +57,7 @@ class AlertRuleIndexTest(TestCase):
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT sql FROM sqlite_master "
-                "WHERE type='index' AND name=%s",
+                "SELECT sql FROM sqlite_master " "WHERE type='index' AND name=%s",
                 [index_name],
             )
             result = cursor.fetchone()
@@ -71,33 +70,26 @@ class AlertRuleIndexTest(TestCase):
         import re
 
         match = re.search(r"ON\s+\S+\s+\((.+?)\)", index_sql)
-        self.assertIsNotNone(
-            match, f"Could not parse columns from SQL: {index_sql}"
-        )
+        self.assertIsNotNone(match, f"Could not parse columns from SQL: {index_sql}")
 
         columns_str = match.group(1)
         # Remove quotes and split by comma
-        columns = [
-            col.strip().strip('"').strip("'") for col in columns_str.split(",")
-        ]
+        columns = [col.strip().strip('"').strip("'") for col in columns_str.split(",")]
 
         # Verify column order
-        self.assertEqual(
-            len(columns), 2, "Index should have exactly 2 columns"
-        )
-        self.assertEqual(
-            columns[0], "customer_id", "First column is customer_id"
-        )
-        self.assertEqual(
-            columns[1], "enabled", "Second column is enabled"
-        )
+        self.assertEqual(len(columns), 2, "Index should have exactly 2 columns")
+        self.assertEqual(columns[0], "customer_id", "First column is customer_id")
+        self.assertEqual(columns[1], "enabled", "Second column is enabled")
 
 
 class NotificationChannelIndexTest(TestCase):
     """Test that NotificationChannel has the correct composite index."""
 
     def test_notificationchannel_has_composite_index(self):
-        """Verify NotificationChannel has composite index on (customer, enabled, channel_type)."""
+        """Verify NotificationChannel has composite index.
+
+        Index: (customer, enabled, channel_type)
+        """
         from upstream.alerts.models import NotificationChannel
 
         table_name = NotificationChannel._meta.db_table
@@ -131,17 +123,21 @@ class NotificationChannelIndexTest(TestCase):
             "enabled", index_sql.lower(), "Index should include enabled column"
         )
         self.assertIn(
-            "channel_type", index_sql.lower(), "Index should include channel_type column"
+            "channel_type",
+            index_sql.lower(),
+            "Index should include channel_type column",
         )
 
     def test_notificationchannel_index_column_order(self):
-        """Verify index has columns in correct order (customer, enabled, channel_type)."""
+        """Verify index column order.
+
+        Order: (customer, enabled, channel_type)
+        """
         index_name = "idx_notificationchannel_lookup"
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT sql FROM sqlite_master "
-                "WHERE type='index' AND name=%s",
+                "SELECT sql FROM sqlite_master " "WHERE type='index' AND name=%s",
                 [index_name],
             )
             result = cursor.fetchone()
@@ -152,29 +148,18 @@ class NotificationChannelIndexTest(TestCase):
 
         # Extract column list
         import re
+
         match = re.search(r"ON\s+\S+\s+\((.+?)\)", index_sql)
-        self.assertIsNotNone(
-            match, f"Could not parse columns from SQL: {index_sql}"
-        )
+        self.assertIsNotNone(match, f"Could not parse columns from SQL: {index_sql}")
 
         columns_str = match.group(1)
-        columns = [
-            col.strip().strip('"').strip("'") for col in columns_str.split(",")
-        ]
+        columns = [col.strip().strip('"').strip("'") for col in columns_str.split(",")]
 
         # Verify column order
-        self.assertEqual(
-            len(columns), 3, "Index should have exactly 3 columns"
-        )
-        self.assertEqual(
-            columns[0], "customer_id", "First column is customer_id"
-        )
-        self.assertEqual(
-            columns[1], "enabled", "Second column is enabled"
-        )
-        self.assertEqual(
-            columns[2], "channel_type", "Third column is channel_type"
-        )
+        self.assertEqual(len(columns), 3, "Index should have exactly 3 columns")
+        self.assertEqual(columns[0], "customer_id", "First column is customer_id")
+        self.assertEqual(columns[1], "enabled", "Second column is enabled")
+        self.assertEqual(columns[2], "channel_type", "Third column is channel_type")
 
 
 class WebhookDeliveryIndexTest(TestCase):
@@ -212,7 +197,9 @@ class WebhookDeliveryIndexTest(TestCase):
             "Index should include status column",
         )
         self.assertIn(
-            "next_attempt_at", index_sql.lower(), "Index should include next_attempt_at column"
+            "next_attempt_at",
+            index_sql.lower(),
+            "Index should include next_attempt_at column",
         )
 
     def test_webhookdelivery_index_column_order(self):
@@ -221,8 +208,7 @@ class WebhookDeliveryIndexTest(TestCase):
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT sql FROM sqlite_master "
-                "WHERE type='index' AND name=%s",
+                "SELECT sql FROM sqlite_master " "WHERE type='index' AND name=%s",
                 [index_name],
             )
             result = cursor.fetchone()
@@ -233,23 +219,16 @@ class WebhookDeliveryIndexTest(TestCase):
 
         # Extract column list
         import re
+
         match = re.search(r"ON\s+\S+\s+\((.+?)\)", index_sql)
-        self.assertIsNotNone(
-            match, f"Could not parse columns from SQL: {index_sql}"
-        )
+        self.assertIsNotNone(match, f"Could not parse columns from SQL: {index_sql}")
 
         columns_str = match.group(1)
-        columns = [
-            col.strip().strip('"').strip("'") for col in columns_str.split(",")
-        ]
+        columns = [col.strip().strip('"').strip("'") for col in columns_str.split(",")]
 
         # Verify column order
-        self.assertEqual(
-            len(columns), 2, "Index should have exactly 2 columns"
-        )
-        self.assertEqual(
-            columns[0], "status", "First column is status"
-        )
+        self.assertEqual(len(columns), 2, "Index should have exactly 2 columns")
+        self.assertEqual(columns[0], "status", "First column is status")
         self.assertEqual(
             columns[1], "next_attempt_at", "Second column is next_attempt_at"
         )

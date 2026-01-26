@@ -6,6 +6,7 @@ This module provides HIPAA-compliant logging configuration with:
 - Retention policies for different log levels
 - PHI/PII scrubbing on all handlers
 - Structured logging for log aggregation tools
+- JSON-formatted logs in production (CloudWatch, Datadog, ELK compatible)
 - Environment-specific configurations
 
 Retention Policies (HIPAA-aligned):

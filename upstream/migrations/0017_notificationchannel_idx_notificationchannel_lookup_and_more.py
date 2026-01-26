@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("upstream", "0016_alertrule_idx_alertrule_customer_enabled"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

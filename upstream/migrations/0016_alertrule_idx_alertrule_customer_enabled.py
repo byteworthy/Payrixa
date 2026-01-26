@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("upstream", "0015_add_unique_constraint_driftevent_phase2"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
