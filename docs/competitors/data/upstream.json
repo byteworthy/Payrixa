@@ -1,0 +1,229 @@
+{
+  "company": {
+    "name": "Upstream",
+    "tagline": "Early-warning payer risk intelligence for specialty practices",
+    "positioning": "Prevention-focused payer behavior monitoring before claims are submitted"
+  },
+  "valueProposition": {
+    "primary": "Know what's changing in payer behavior before it costs you",
+    "secondary": "Specialty-specific intelligence for dialysis, ABA therapy, imaging, and home health",
+    "differentiator": "Early-warning behavioral drift detection vs. reactive real-time alerts"
+  },
+  "coreDifferentiators": [
+    "Early-warning payer behavioral drift detection (weeks before denials appear)",
+    "Specialty-specific rules for dialysis (ESRD PPS), ABA (authorization tracking), imaging (prior auth patterns), home health (OASIS tracking)",
+    "30-day implementation - EHR-independent data connection",
+    "Transparent fixed monthly pricing - no percentage of recovery",
+    "Prevention-focused: alerts before submission, not after",
+    "DriftWatch™ proprietary algorithm for longitudinal payer behavior analysis"
+  ],
+  "pricing": {
+    "model": "Fixed monthly subscription",
+    "structure": "Transparent tiered pricing based on practice size",
+    "transparency": "High - pricing published and predictable",
+    "tiers": [
+      {
+        "name": "Small Practice",
+        "providers": "1-5",
+        "stations": "N/A",
+        "monthlyFee": "$1,500",
+        "includes": [
+          "DriftWatch behavioral monitoring",
+          "DenialScope analytics",
+          "Email and in-app alerts",
+          "Standard support"
+        ]
+      },
+      {
+        "name": "Medium Practice",
+        "providers": "6-20",
+        "stations": "5-15 dialysis stations",
+        "monthlyFee": "$3,500",
+        "includes": [
+          "All Small Practice features",
+          "Specialty-specific rules (dialysis, ABA, imaging, home health)",
+          "Priority support",
+          "Quarterly business reviews"
+        ]
+      },
+      {
+        "name": "Large Practice/Multi-Site",
+        "providers": "20+",
+        "stations": "15+ dialysis stations",
+        "monthlyFee": "Custom pricing",
+        "includes": [
+          "All Medium Practice features",
+          "Multi-site management",
+          "Dedicated account manager",
+          "Custom rule configuration",
+          "API access"
+        ]
+      }
+    ],
+    "paymentTiming": "Monthly subscription - predictable budgeting",
+    "notes": [
+      "No percentage-based fees - fixed cost regardless of denial volume",
+      "No hidden costs or recovery-based pricing",
+      "Annual contracts available with discount"
+    ]
+  },
+  "features": {
+    "payerIntelligence": {
+      "earlyWarningDetection": {
+        "available": true,
+        "rating": 5,
+        "description": "DriftWatch™ detects payer behavioral changes 2-4 weeks before denials appear",
+        "uniqueValue": "Longitudinal analysis of payer patterns to predict future denials"
+      },
+      "behavioralDriftTracking": {
+        "available": true,
+        "rating": 5,
+        "description": "Tracks subtle shifts in payer approval patterns, authorization requirements, documentation standards",
+        "uniqueValue": "Proprietary algorithm analyzes trends over time, not just point-in-time alerts"
+      },
+      "specialtySpecificRules": {
+        "available": true,
+        "rating": 5,
+        "description": "Custom intelligence for dialysis (ESRD PPS changes), ABA (authorization tracking), imaging (prior auth), home health (OASIS)",
+        "supportedSpecialties": [
+          "Dialysis (ESRD PPS bundle changes, modifier tracking, comorbidity shifts)",
+          "ABA Therapy (authorization expiration, session limits, medical necessity changes)",
+          "Imaging (prior authorization pattern shifts, medical necessity criteria)",
+          "Home Health (OASIS documentation changes, episode timing, LUPA risks)"
+        ]
+      },
+      "realTimeAlerts": {
+        "available": false,
+        "rating": 2,
+        "description": "Alerts are early-warning (pre-submission), not real-time at submission",
+        "note": "By design - we alert before claims go out, not after"
+      }
+    },
+    "denialPrevention": {
+      "preSubmissionWarnings": {
+        "available": true,
+        "rating": 5,
+        "description": "Alerts before claims are submitted, allowing prevention rather than recovery"
+      },
+      "denialScopeAnalytics": {
+        "available": true,
+        "rating": 5,
+        "description": "DenialScope™ dashboard shows denial trends, root causes, and prevention opportunities"
+      },
+      "actionableRecommendations": {
+        "available": true,
+        "rating": 5,
+        "description": "Specific recommendations on how to adjust coding, documentation, or workflows to prevent denials"
+      }
+    },
+    "integrations": {
+      "ehrSystems": {
+        "available": false,
+        "rating": 2,
+        "description": "EHR-independent - connects via data feeds, not embedded in EHR",
+        "note": "By design - allows faster implementation and flexibility",
+        "supportedConnections": [
+          "Direct data feeds from clearinghouses",
+          "CSV/Excel uploads",
+          "API connections (custom)"
+        ]
+      },
+      "clearinghouseIntegration": {
+        "available": true,
+        "rating": 4,
+        "description": "Connects to major clearinghouses for claims data access"
+      },
+      "independentDeployment": {
+        "available": true,
+        "rating": 5,
+        "description": "No EHR vendor coordination required - independent data connection"
+      }
+    },
+    "implementation": {
+      "estimatedTimeline": "30 days",
+      "ehrDependency": "None - EHR-independent",
+      "setupComplexity": "Low - data connection + specialty rule configuration",
+      "dataConnectionMethod": "Clearinghouse feed, CSV upload, or API",
+      "trainingRequired": "1 day onboarding session",
+      "fastTrackAvailable": "Yes - can be live in 2 weeks for urgent needs"
+    },
+    "support": {
+      "customerSupport": "Email, phone, and in-app chat during business hours",
+      "implementationSupport": "Dedicated onboarding specialist for 30-day implementation",
+      "accountManagement": "Quarterly business reviews for all customers (not just enterprise)",
+      "technicalSupport": "Direct access to product team for specialty-specific questions",
+      "specialtyExpertise": "In-house experts in dialysis, ABA, imaging, and home health billing"
+    }
+  },
+  "strengths": [
+    "Early-warning behavioral drift detection (2-4 weeks before denials appear)",
+    "Specialty-specific intelligence for dialysis, ABA, imaging, home health",
+    "30-day implementation (vs. 3-6 months for EHR-integrated solutions)",
+    "Transparent fixed monthly pricing (no percentage of recovery)",
+    "Prevention-focused (alerts before submission, not after)",
+    "EHR-independent (no vendor coordination, faster deployment)",
+    "Quarterly business reviews for all customers (not just enterprise)"
+  ],
+  "weaknesses": [
+    "Not embedded in EHR workflows (separate login required)",
+    "Fewer integrations than established players (newer product)",
+    "No real-time alerts at point of claim submission (by design - we're pre-submission)",
+    "Narrower specialty focus (not ideal for general practices outside dialysis/ABA/imaging/home health)",
+    "Less market presence and brand recognition than established RCM vendors"
+  ],
+  "targetSegments": [
+    "Dialysis centers (5-50 stations) focused on ESRD PPS changes and comorbidity tracking",
+    "ABA therapy clinics (10-100 BCBAs) managing authorization expirations and session limits",
+    "Imaging centers (outpatient radiology, MRI, CT) tracking prior authorization pattern shifts",
+    "Home health agencies (small to mid-size) monitoring OASIS documentation and episode timing"
+  ],
+  "implementationProcess": [
+    {
+      "phase": "Week 1: Kickoff & Data Connection",
+      "activities": [
+        "Initial kickoff call with onboarding specialist",
+        "Connect data feed from clearinghouse or set up CSV upload",
+        "Verify data quality and historical claims visibility"
+      ]
+    },
+    {
+      "phase": "Week 2-3: Configuration & Specialty Rules Setup",
+      "activities": [
+        "Configure specialty-specific rules (dialysis ESRD PPS, ABA auth tracking, etc.)",
+        "Set alert thresholds based on practice's denial tolerance",
+        "Train staff on DriftWatch and DenialScope dashboards"
+      ]
+    },
+    {
+      "phase": "Week 4: Testing & Launch",
+      "activities": [
+        "Test alert delivery (email, in-app, Slack integration if desired)",
+        "Review first batch of early-warning alerts",
+        "Go live with production monitoring"
+      ]
+    },
+    {
+      "phase": "Ongoing: Support & Optimization",
+      "activities": [
+        "Quarterly business reviews to refine alert rules",
+        "Monitor denial rate improvements",
+        "Adjust specialty-specific configurations as payers change policies"
+      ]
+    }
+  ],
+  "supportModel": {
+    "onboarding": "Dedicated specialist for 30 days",
+    "ongoing": "Email, phone, in-app chat during business hours",
+    "quarterlyReviews": "All customers (not just enterprise)",
+    "specialtyExpertise": "Direct access to dialysis, ABA, imaging, and home health billing experts",
+    "responseTime": "4-hour SLA for critical alerts, 24-hour for general inquiries"
+  },
+  "competitivePositioning": {
+    "vsAdonisIntelligence": "Early-warning prevention vs. real-time reactive alerts; specialty-specific vs. general; 30-day implementation vs. 3-6 months EHR integration",
+    "vsRivetHealth": "Behavioral drift detection vs. contract benchmarking; denial prevention vs. underpayment detection",
+    "vsMDClarity": "Proactive payer intelligence vs. retrospective underpayment analysis",
+    "vsInfinx": "Prevention vs. recovery; early-warning vs. A/R follow-up",
+    "vsEnterpriseRCM": "Specialty-focused vs. enterprise generalist; fast implementation vs. lengthy EHR projects"
+  },
+  "lastUpdated": "2026-01-26"
+}

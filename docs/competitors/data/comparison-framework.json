@@ -1,0 +1,386 @@
+{
+  "comparisonMethodology": {
+    "version": "1.0",
+    "lastUpdated": "2026-01-26",
+    "ratingScale": {
+      "description": "1-5 scale for feature comparisons",
+      "scale": {
+        "5": "Excellent - Industry-leading capability",
+        "4": "Good - Strong capability with minor limitations",
+        "3": "Adequate - Meets basic requirements",
+        "2": "Limited - Minimal capability or significant gaps",
+        "1": "Not available - Feature does not exist"
+      }
+    },
+    "fairnessStandards": [
+      "Acknowledge competitor strengths honestly",
+      "Highlight Upstream strengths without exaggeration",
+      "Use specific, verifiable claims (not superlatives like 'best' or 'leading')",
+      "Provide context for ratings (why 5 vs. 4, why 2 vs. 1)",
+      "Include honest Upstream weaknesses where applicable",
+      "Focus on objective differences, not subjective superiority"
+    ]
+  },
+  "comparisonCategories": [
+    {
+      "id": "payer-intelligence",
+      "name": "Payer Intelligence & Monitoring",
+      "weight": "high",
+      "description": "Core capability to detect and alert on payer behavior changes",
+      "dimensions": [
+        {
+          "id": "early-warning-detection",
+          "name": "Early-Warning Detection",
+          "description": "Ability to detect payer behavior changes BEFORE claims are submitted",
+          "importance": "critical",
+          "upstreamAdvantage": true
+        },
+        {
+          "id": "real-time-alerts",
+          "name": "Real-Time Alerts",
+          "description": "Alerts at the moment of claim submission or shortly after",
+          "importance": "high",
+          "upstreamAdvantage": false
+        },
+        {
+          "id": "behavioral-drift-tracking",
+          "name": "Behavioral Drift Tracking",
+          "description": "Longitudinal analysis of payer patterns over weeks/months",
+          "importance": "high",
+          "upstreamAdvantage": true
+        },
+        {
+          "id": "specialty-specific-rules",
+          "name": "Specialty-Specific Intelligence",
+          "description": "Custom rules for dialysis, ABA, imaging, home health (not general)",
+          "importance": "critical",
+          "upstreamAdvantage": true
+        }
+      ]
+    },
+    {
+      "id": "denial-prevention",
+      "name": "Denial Prevention Capabilities",
+      "weight": "high",
+      "description": "Features that prevent denials before submission, not just recovery after",
+      "dimensions": [
+        {
+          "id": "pre-submission-warnings",
+          "name": "Pre-Submission Warnings",
+          "description": "Alerts that fire before claims go out, allowing prevention",
+          "importance": "critical",
+          "upstreamAdvantage": true
+        },
+        {
+          "id": "actionable-recommendations",
+          "name": "Actionable Recommendations",
+          "description": "Specific guidance on how to adjust coding/documentation",
+          "importance": "high",
+          "upstreamAdvantage": true
+        },
+        {
+          "id": "edit-validation",
+          "name": "Edit Validation Integration",
+          "description": "Integration with claim scrubbing engines for edit checks",
+          "importance": "medium",
+          "upstreamAdvantage": false
+        }
+      ]
+    },
+    {
+      "id": "implementation",
+      "name": "Implementation & Onboarding",
+      "weight": "high",
+      "description": "Speed, complexity, and dependencies for going live",
+      "dimensions": [
+        {
+          "id": "timeline",
+          "name": "Implementation Timeline",
+          "description": "Time from contract signing to go-live",
+          "importance": "critical",
+          "upstreamAdvantage": true,
+          "upstreamValue": "30 days",
+          "competitorComparison": "3-6 months (EHR-dependent)"
+        },
+        {
+          "id": "ehr-dependency",
+          "name": "EHR Dependency",
+          "description": "Whether solution requires EHR vendor coordination and integration",
+          "importance": "high",
+          "upstreamAdvantage": true,
+          "upstreamValue": "EHR-independent",
+          "competitorComparison": "High EHR dependency"
+        },
+        {
+          "id": "setup-complexity",
+          "name": "Setup Complexity",
+          "description": "Technical complexity and IT resources required",
+          "importance": "high",
+          "upstreamAdvantage": true,
+          "upstreamValue": "Low - data connection + config",
+          "competitorComparison": "High - EHR integration project"
+        },
+        {
+          "id": "training-requirements",
+          "name": "Training Requirements",
+          "description": "Staff training time needed to use the system",
+          "importance": "medium",
+          "upstreamValue": "1 day onboarding",
+          "competitorComparison": "2-3 days EHR workflow training"
+        }
+      ]
+    },
+    {
+      "id": "integrations",
+      "name": "Integrations & Connectivity",
+      "weight": "medium",
+      "description": "Depth of integration with EHR, PM, and clearinghouse systems",
+      "dimensions": [
+        {
+          "id": "ehr-integration",
+          "name": "EHR System Integration",
+          "description": "Direct integration with EHR platforms",
+          "importance": "medium",
+          "upstreamAdvantage": false,
+          "note": "Adonis has deep EHR integrations; Upstream is EHR-independent by design"
+        },
+        {
+          "id": "clearinghouse-integration",
+          "name": "Clearinghouse Integration",
+          "description": "Integration with major clearinghouses for claims data",
+          "importance": "high",
+          "upstreamAdvantage": null,
+          "note": "Both support clearinghouse connections"
+        },
+        {
+          "id": "api-access",
+          "name": "API Access",
+          "description": "APIs for custom integrations and data extraction",
+          "importance": "low",
+          "upstreamAdvantage": null,
+          "note": "Available for enterprise customers"
+        }
+      ]
+    },
+    {
+      "id": "support",
+      "name": "Support & Customer Success",
+      "weight": "medium",
+      "description": "Quality and availability of customer support, training, and success resources",
+      "dimensions": [
+        {
+          "id": "implementation-support",
+          "name": "Implementation Support",
+          "description": "Dedicated resources during onboarding",
+          "importance": "high",
+          "upstreamAdvantage": true,
+          "upstreamValue": "Dedicated onboarding specialist for all customers",
+          "competitorComparison": "Onboarding team (enterprise focus)"
+        },
+        {
+          "id": "ongoing-support",
+          "name": "Ongoing Support",
+          "description": "Support availability after go-live",
+          "importance": "high",
+          "upstreamAdvantage": null,
+          "note": "Both offer business hours support"
+        },
+        {
+          "id": "specialty-expertise",
+          "name": "Specialty Billing Expertise",
+          "description": "Access to specialists in dialysis, ABA, imaging, home health",
+          "importance": "critical",
+          "upstreamAdvantage": true,
+          "upstreamValue": "In-house dialysis/ABA/imaging/home health experts",
+          "competitorComparison": "General RCM expertise"
+        },
+        {
+          "id": "account-management",
+          "name": "Account Management",
+          "description": "Proactive account reviews and optimization",
+          "importance": "medium",
+          "upstreamAdvantage": true,
+          "upstreamValue": "Quarterly reviews for all customers",
+          "competitorComparison": "Quarterly reviews for enterprise only"
+        }
+      ]
+    },
+    {
+      "id": "pricing",
+      "name": "Pricing & Value",
+      "weight": "high",
+      "description": "Pricing model, transparency, and total cost of ownership",
+      "dimensions": [
+        {
+          "id": "pricing-model",
+          "name": "Pricing Model",
+          "description": "Fixed subscription vs. percentage-based",
+          "importance": "critical",
+          "upstreamAdvantage": true,
+          "upstreamValue": "Fixed monthly subscription",
+          "competitorComparison": "Percentage of recovery (variable)"
+        },
+        {
+          "id": "pricing-transparency",
+          "name": "Pricing Transparency",
+          "description": "Whether pricing is publicly disclosed and predictable",
+          "importance": "high",
+          "upstreamAdvantage": true,
+          "upstreamValue": "Transparent published pricing",
+          "competitorComparison": "Pricing not disclosed (varies by customer)"
+        },
+        {
+          "id": "total-cost-predictability",
+          "name": "Total Cost Predictability",
+          "description": "Ability to budget accurately for annual costs",
+          "importance": "high",
+          "upstreamAdvantage": true,
+          "upstreamValue": "Fixed monthly cost - predictable",
+          "competitorComparison": "Variable based on denials - unpredictable"
+        }
+      ]
+    }
+  ],
+  "useCaseMapping": {
+    "description": "Decision framework for when to choose each product",
+    "decisionCriteria": [
+      {
+        "criterion": "Specialty Focus",
+        "chooseUpstream": [
+          "Dialysis centers (ESRD PPS tracking critical)",
+          "ABA therapy clinics (authorization management critical)",
+          "Imaging centers (prior auth pattern tracking critical)",
+          "Home health agencies (OASIS documentation tracking critical)"
+        ],
+        "chooseCompetitor": [
+          "General specialty practices (primary care, urgent care, general surgery)",
+          "Multi-specialty groups without high-complexity verticals"
+        ]
+      },
+      {
+        "criterion": "Implementation Timeline",
+        "chooseUpstream": [
+          "Need to go live in 30-60 days",
+          "Cannot wait 3-6 months for EHR integration project",
+          "Limited IT resources for complex integrations"
+        ],
+        "chooseCompetitor": [
+          "No urgency - can wait 3-6 months for EHR integration",
+          "Strong preference for EHR-embedded solution (even if slower)",
+          "IT resources available for integration project"
+        ]
+      },
+      {
+        "criterion": "Prevention vs. Recovery Focus",
+        "chooseUpstream": [
+          "Want to prevent denials before submission (proactive)",
+          "Need early-warning signals (2-4 weeks advance notice)",
+          "Focus on behavioral drift detection (longitudinal analysis)"
+        ],
+        "chooseCompetitor": [
+          "Primarily focused on real-time alerts at submission",
+          "Prefer reactive alerts to proactive prevention",
+          "Already have strong scrubbing processes (need alerts for what gets through)"
+        ]
+      },
+      {
+        "criterion": "Pricing & Budgeting",
+        "chooseUpstream": [
+          "Need transparent fixed pricing for budgeting",
+          "CFO/owner requires predictable monthly costs",
+          "Prefer subscription model over percentage of recovery"
+        ],
+        "chooseCompetitor": [
+          "Comfortable with variable percentage-based pricing",
+          "ROI-based model aligns with internal approval processes",
+          "Willing to accept pricing opacity for EHR integration benefits"
+        ]
+      },
+      {
+        "criterion": "EHR Integration Preference",
+        "chooseUpstream": [
+          "Do not need EHR-embedded solution (separate login acceptable)",
+          "Want EHR-independent deployment (no vendor coordination)",
+          "Use unsupported EHR or custom PM system"
+        ],
+        "chooseCompetitor": [
+          "Must have EHR-embedded solution (no separate login)",
+          "Already on athenahealth, AdvancedMD, or eClinicalWorks",
+          "Staff resistant to separate tools outside EHR"
+        ]
+      }
+    ]
+  },
+  "pricingComparisonScenarios": [
+    {
+      "scenario": "Small Dialysis Center",
+      "size": "5-10 stations",
+      "providers": "3-5 nephrologists",
+      "upstreamCost": {
+        "monthly": "$1,500",
+        "annual": "$18,000",
+        "notes": "Fixed monthly fee - predictable budgeting"
+      },
+      "competitorCost": {
+        "monthly": "$2,000 - $3,500 (estimated)",
+        "annual": "$24,000 - $42,000 (estimated)",
+        "notes": "Percentage of recovery - varies with denial volume",
+        "assumptions": "Assumes 10-15% of recovered denials, ~$200k-$300k annual recoveries"
+      },
+      "costDifference": "Upstream typically 25-40% lower annual cost"
+    },
+    {
+      "scenario": "Medium ABA Therapy Clinic",
+      "size": "15-25 BCBAs",
+      "providers": "15-25",
+      "upstreamCost": {
+        "monthly": "$3,500",
+        "annual": "$42,000",
+        "notes": "Fixed monthly fee - predictable budgeting"
+      },
+      "competitorCost": {
+        "monthly": "$4,000 - $6,000 (estimated)",
+        "annual": "$48,000 - $72,000 (estimated)",
+        "notes": "Percentage of recovery - varies with denial volume",
+        "assumptions": "Assumes 10-15% of recovered denials, ~$400k-$600k annual recoveries"
+      },
+      "costDifference": "Upstream typically 15-40% lower annual cost"
+    },
+    {
+      "scenario": "Large Imaging Center",
+      "size": "3 locations, 20+ providers",
+      "providers": "20+",
+      "upstreamCost": {
+        "monthly": "Custom pricing (~$5,000-$7,000)",
+        "annual": "$60,000 - $84,000",
+        "notes": "Fixed monthly fee - predictable budgeting"
+      },
+      "competitorCost": {
+        "monthly": "$6,000 - $10,000 (estimated)",
+        "annual": "$72,000 - $120,000 (estimated)",
+        "notes": "Percentage of recovery - varies with denial volume",
+        "assumptions": "Assumes 10-15% of recovered denials, ~$600k-$1M annual recoveries"
+      },
+      "costDifference": "Upstream typically 10-30% lower annual cost"
+    }
+  ],
+  "conversionThresholds": {
+    "highConfidence": [
+      "Dialysis, ABA, imaging, or home health specialty",
+      "Need implementation in under 60 days",
+      "CFO/owner requires transparent pricing",
+      "Frustrated with EHR integration delays from previous vendors"
+    ],
+    "mediumConfidence": [
+      "General specialty but interested in prevention vs. recovery",
+      "On unsupported EHR platform (not athena/AdvancedMD/eCW)",
+      "Small practice (under 10 providers) needing simple deployment"
+    ],
+    "lowConfidence": [
+      "Already deeply integrated with athenahealth/AdvancedMD/eCW and satisfied",
+      "Strong preference for EHR-embedded solution (will not use separate tool)",
+      "General specialty practice with no interest in specialty-specific intelligence",
+      "Enterprise organization requiring extensive vendor vetting (Upstream too new)"
+    ]
+  }
+}
