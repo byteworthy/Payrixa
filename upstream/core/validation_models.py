@@ -145,6 +145,15 @@ class ValidationResult(BaseModel):
             models.Index(fields=['customer', 'upload', 'severity']),
             models.Index(fields=['customer', 'validation_rule', '-created_at']),
             models.Index(fields=['customer', 'passed', '-created_at']),
+            # Covering indexes for aggregate queries (Phase 3 Task #2)
+            models.Index(
+                fields=["customer", "passed", "field_name"],
+                name="valres_field_analysis_idx",
+            ),
+            models.Index(
+                fields=["customer", "-created_at", "severity"],
+                name="valres_severity_agg_idx",
+            ),
         ]
 
     def __str__(self):

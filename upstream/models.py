@@ -225,6 +225,11 @@ class DataQualityReport(models.Model):
                 fields=["customer", "-created_at"], name="dqr_cust_created_idx"
             ),
             models.Index(fields=["upload"], name="dqr_upload_idx"),
+            # Covering index for aggregate queries - uses DataQualityReport.created_at
+            models.Index(
+                fields=["customer", "-created_at"],
+                name="dqr_cust_date_agg_idx",
+            ),
         ]
 
     def __str__(self):
@@ -416,6 +421,15 @@ class ClaimRecord(models.Model):
             models.Index(
                 fields=["customer", "authorization_required", "authorization_obtained"],
                 name="claim_auth_idx",
+            ),
+            # Covering indexes for aggregate queries (Phase 3 Task #2)
+            models.Index(
+                fields=["customer", "decided_date", "payer", "cpt_group", "outcome"],
+                name="claim_analytics_agg_idx",
+            ),
+            models.Index(
+                fields=["customer", "payer", "-decided_date"],
+                name="claim_payer_payment_idx",
             ),
             models.Index(
                 fields=["customer", "validation_passed", "processed_at"],
