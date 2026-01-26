@@ -17,6 +17,7 @@ from django.core.cache import cache
 from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from datetime import datetime, timedelta
+from django_filters.rest_framework import DjangoFilterBackend
 
 # HIGH-2: JWT auth views with rate limiting
 from rest_framework_simplejwt.views import (
@@ -65,6 +66,7 @@ from .serializers import (
     OperatorFeedbackSerializer,
 )
 from .permissions import IsCustomerMember, get_user_customer
+from .filters import ClaimRecordFilter, DriftEventFilter
 
 
 class CustomerFilterMixin:
@@ -150,7 +152,9 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
     serializer_class = UploadSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
     throttle_classes = [BulkOperationThrottle]  # QW-5: Rate limit bulk uploads
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status']
+    search_fields = ['filename', 'status']
     ordering_fields = ["uploaded_at", "status", "row_count"]
 
     def get_queryset(self):
@@ -205,7 +209,9 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = ClaimRecordSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
     throttle_classes = [ReadOnlyThrottle]  # QW-5: Liberal rate limit for reads
-    filter_backends = [filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = ClaimRecordFilter
+    search_fields = ['claim_number', 'payer', 'cpt_code']
     ordering_fields = ["decided_date", "submitted_date", "payer", "outcome"]
 
     def get_serializer_class(self):
@@ -220,48 +226,6 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
         # ClaimRecordSerializer includes 'customer' and 'upload' fields
         if self.action == "retrieve":
             queryset = queryset.select_related("customer", "upload")
-
-        # Filter by payer
-        payer = self.request.query_params.get("payer")
-        if payer:
-            queryset = queryset.filter(payer__iexact=payer)
-
-        # Filter by outcome
-        outcome = self.request.query_params.get("outcome")
-        if outcome:
-            queryset = queryset.filter(outcome=outcome.upper())
-
-        # Filter by date range (HIGH-7: Add input validation)
-        start_date = self.request.query_params.get("start_date")
-        end_date = self.request.query_params.get("end_date")
-
-        if start_date:
-            try:
-                # Validate date format (YYYY-MM-DD)
-                datetime.strptime(start_date, "%Y-%m-%d")
-                queryset = queryset.filter(decided_date__gte=start_date)
-            except ValueError:
-                raise ValidationError(
-                    {
-                        "start_date": (
-                            "Invalid date format. Use YYYY-MM-DD (e.g., 2024-01-15)"
-                        )
-                    }
-                )
-
-        if end_date:
-            try:
-                # Validate date format (YYYY-MM-DD)
-                datetime.strptime(end_date, "%Y-%m-%d")
-                queryset = queryset.filter(decided_date__lte=end_date)
-            except ValueError:
-                raise ValidationError(
-                    {
-                        "end_date": (
-                            "Invalid date format. Use YYYY-MM-DD (e.g., 2024-01-15)"
-                        )
-                    }
-                )
 
         return queryset
 
@@ -444,26 +408,10 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DriftEventSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
     throttle_classes = [ReadOnlyThrottle]  # QW-5: Liberal rate limit for reads
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Filter by severity
-        min_severity = self.request.query_params.get("min_severity")
-        if min_severity:
-            queryset = queryset.filter(severity__gte=float(min_severity))
-
-        # Filter by payer
-        payer = self.request.query_params.get("payer")
-        if payer:
-            queryset = queryset.filter(payer__iexact=payer)
-
-        # Filter by drift type
-        drift_type = self.request.query_params.get("drift_type")
-        if drift_type:
-            queryset = queryset.filter(drift_type=drift_type.upper())
-
-        return queryset
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = DriftEventFilter
+    search_fields = ['payer', 'cpt_code']
+    ordering_fields = ['created_at', 'severity', 'payer']
 
     @extend_schema(
         summary="Get active (recent) drift events",
@@ -646,6 +594,10 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     )
     serializer_class = AlertEventSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'delivery_method']
+    search_fields = ['drift_event__payer']
+    ordering_fields = ['triggered_at', 'status']
     ordering = ["-triggered_at"]
 
     @action(detail=True, methods=["post"], url_path="feedback")
