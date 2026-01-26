@@ -12,17 +12,27 @@ Usage:
     # Add context for this request/operation
     with add_log_context(customer_id=customer.id, user_id=user.id):
         logger.info("Processing upload", extra={'upload_id': upload.id})
+
+JSON Logging (Production):
+    Production environments use JSONLogFormatter for structured JSON logs
+    compatible with CloudWatch, Datadog, ELK, and other log aggregation tools.
+
+    Development environments use StructuredLogFormatter for human-readable
+    key=value logs.
+
+    All logs pass through PHI scrubbing filters before serialization.
 """
 
 import logging
-import threading
 from typing import Any, Dict, Optional
 from contextvars import ContextVar
+from datetime import datetime
 from django.http import HttpRequest
+from pythonjsonlogger import jsonlogger
 
 
 # Thread-local storage for log context
-_log_context: ContextVar[Dict[str, Any]] = ContextVar('log_context', default={})
+_log_context: ContextVar[Dict[str, Any]] = ContextVar("log_context", default={})
 
 
 class ContextualLoggerAdapter(logging.LoggerAdapter):
@@ -49,9 +59,9 @@ class ContextualLoggerAdapter(logging.LoggerAdapter):
         context = _log_context.get({})
 
         # Merge context with extra data
-        extra = kwargs.get('extra', {})
+        extra = kwargs.get("extra", {})
         extra.update(context)
-        kwargs['extra'] = extra
+        kwargs["extra"] = extra
 
         return msg, kwargs
 
@@ -162,29 +172,29 @@ def extract_request_context(request: HttpRequest) -> Dict[str, Any]:
     # Add request ID
     request_id = get_request_id()
     if request_id:
-        context['request_id'] = request_id
+        context["request_id"] = request_id
 
     # Add user information
-    if hasattr(request, 'user') and request.user.is_authenticated:
-        context['user_id'] = request.user.id
-        context['username'] = request.user.username
+    if hasattr(request, "user") and request.user.is_authenticated:
+        context["user_id"] = request.user.id
+        context["username"] = request.user.username
 
         # Add customer information
         profile = get_user_profile(request.user)
-        if profile and hasattr(profile, 'customer'):
-            context['customer_id'] = profile.customer.id
-            context['customer_name'] = profile.customer.name
+        if profile and hasattr(profile, "customer"):
+            context["customer_id"] = profile.customer.id
+            context["customer_name"] = profile.customer.name
 
     # Add request metadata
-    context['method'] = request.method
-    context['path'] = request.path
+    context["method"] = request.method
+    context["path"] = request.path
 
     # Add IP address (be careful with privacy)
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
-        context['ip'] = x_forwarded_for.split(',')[0].strip()
+        context["ip"] = x_forwarded_for.split(",")[0].strip()
     else:
-        context['ip'] = request.META.get('REMOTE_ADDR', 'unknown')
+        context["ip"] = request.META.get("REMOTE_ADDR", "unknown")
 
     return context
 
@@ -197,7 +207,8 @@ class StructuredLogFormatter(logging.Formatter):
     like CloudWatch, Datadog, or ELK stack.
 
     Example output:
-        2024-01-28 10:30:45 INFO customer_id=123 user_id=456 request_id=abc message="Upload complete"
+        2024-01-28 10:30:45 INFO customer_id=123 user_id=456
+        request_id=abc message="Upload complete"
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -217,40 +228,113 @@ class StructuredLogFormatter(logging.Formatter):
 
         # Add context fields
         context_fields = [
-            'customer_id',
-            'customer_name',
-            'user_id',
-            'username',
-            'request_id',
-            'method',
-            'path',
-            'ip',
+            "customer_id",
+            "customer_name",
+            "user_id",
+            "username",
+            "request_id",
+            "method",
+            "path",
+            "ip",
         ]
 
         for field in context_fields:
             if hasattr(record, field):
                 value = getattr(record, field)
                 # Quote strings with spaces
-                if isinstance(value, str) and ' ' in value:
+                if isinstance(value, str) and " " in value:
                     parts.append(f'{field}="{value}"')
                 else:
-                    parts.append(f'{field}={value}')
+                    parts.append(f"{field}={value}")
 
         # Add the main message
         msg = record.getMessage()
-        if ' ' in msg or '=' in msg:
+        if " " in msg or "=" in msg:
             parts.append(f'message="{msg}"')
         else:
-            parts.append(f'message={msg}')
+            parts.append(f"message={msg}")
 
         # Add exception info if present
         if record.exc_info and not record.exc_text:
             record.exc_text = self.formatException(record.exc_info)
 
         if record.exc_text:
-            parts.append(f'\n{record.exc_text}')
+            parts.append(f"\n{record.exc_text}")
 
-        return ' '.join(parts)
+        return " ".join(parts)
+
+
+class JSONLogFormatter(jsonlogger.JsonFormatter):
+    """
+    JSON log formatter for production observability.
+
+    Outputs logs in JSON format compatible with CloudWatch, Datadog, ELK.
+    Automatically includes context fields from ContextualLoggerAdapter.
+
+    Example output:
+        {
+          "timestamp": "2024-01-28T10:30:45.123456",
+          "level": "INFO",
+          "logger": "upstream.services.payer_drift",
+          "message": "Drift computation complete",
+          "customer_id": 123,
+          "user_id": 456,
+          "request_id": "abc-def-123",
+          "service_name": "payer_drift",
+          "events_created": 15
+        }
+
+    Note: All PHI/PII is scrubbed before JSON serialization via
+    PHIScrubberFilter.
+    """
+
+    def add_fields(
+        self,
+        log_record: Dict[str, Any],
+        record: logging.LogRecord,
+        message_dict: Dict[str, Any],
+    ) -> None:
+        """
+        Add custom fields to the JSON log record.
+
+        Args:
+            log_record: The output JSON log record (modified in place)
+            record: The Python LogRecord object
+            message_dict: Additional fields from the log message
+        """
+        super().add_fields(log_record, record, message_dict)
+
+        # Add ISO 8601 timestamp
+        log_record["timestamp"] = datetime.fromtimestamp(record.created).isoformat()
+
+        # Add standard fields
+        log_record["level"] = record.levelname
+        log_record["logger"] = record.name
+
+        # Ensure message is always included
+        if "message" not in log_record and record.getMessage():
+            log_record["message"] = record.getMessage()
+
+        # Add context fields if present on the record
+        context_fields = [
+            "customer_id",
+            "customer_name",
+            "user_id",
+            "username",
+            "request_id",
+            "method",
+            "path",
+            "service_name",
+            "task_name",
+        ]
+
+        for field in context_fields:
+            if hasattr(record, field):
+                log_record[field] = getattr(record, field)
+
+        # Add exception info if present
+        if record.exc_info and not log_record.get("exc_info"):
+            log_record["exc_info"] = self.formatException(record.exc_info)
 
 
 # Pre-configured logger instances for common use cases
@@ -274,7 +358,7 @@ def get_service_logger(service_name: str) -> ContextualLoggerAdapter:
     class ServiceLoggerAdapter(ContextualLoggerAdapter):
         def process(self, msg, kwargs):
             msg, kwargs = super().process(msg, kwargs)
-            kwargs['extra']['service_name'] = service_name
+            kwargs["extra"]["service_name"] = service_name
             return msg, kwargs
 
     return ServiceLoggerAdapter(logger.logger, {})
@@ -300,7 +384,7 @@ def get_task_logger(task_name: str) -> ContextualLoggerAdapter:
     class TaskLoggerAdapter(ContextualLoggerAdapter):
         def process(self, msg, kwargs):
             msg, kwargs = super().process(msg, kwargs)
-            kwargs['extra']['task_name'] = task_name
+            kwargs["extra"]["task_name"] = task_name
             return msg, kwargs
 
     return TaskLoggerAdapter(logger.logger, {})

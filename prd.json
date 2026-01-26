@@ -56,7 +56,7 @@
         "upstream/alerts/models.py",
         "upstream/migrations/00XX_add_alertrule_composite_index.py"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": 3,

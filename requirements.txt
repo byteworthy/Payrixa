@@ -21,6 +21,7 @@ sqlparse~=0.5.1
 # Security & PHI Compliance
 django-encrypted-model-fields~=0.6.5
 django-auditlog~=3.0.0
+python-json-logger~=2.0.7
 cryptography~=42.0.0
 
 # API Layer (Django REST Framework)
