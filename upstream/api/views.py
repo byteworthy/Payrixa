@@ -10,12 +10,16 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError
 from django.db.models import Count, Avg, Q
 from django.utils import timezone
 from django.core.cache import cache
 from django.conf import settings
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiExample,
+)
 from drf_spectacular.types import OpenApiTypes
 from datetime import datetime, timedelta
 from django_filters.rest_framework import DjangoFilterBackend
@@ -107,7 +111,10 @@ class CustomerFilterMixin:
 @extend_schema_view(
     list=extend_schema(
         summary="List customers",
-        description="Retrieve a list of customers. Regular users only see their own customer; superusers see all.",
+        description=(
+            "Retrieve a list of customers. Regular users only see their own "
+            "customer; superusers see all."
+        ),
         tags=["Customers"],
     ),
     retrieve=extend_schema(
@@ -140,12 +147,18 @@ class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="List settings",
-        description="Retrieve customer settings. Returns settings for the authenticated user's customer.",
+        description=(
+            "Retrieve customer settings. Returns settings for the "
+            "authenticated user's customer."
+        ),
         tags=["Settings"],
     ),
     retrieve=extend_schema(
         summary="Get settings",
-        description="Retrieve specific customer settings. Gets or creates settings for the user's customer.",
+        description=(
+            "Retrieve specific customer settings. Gets or creates settings "
+            "for the user's customer."
+        ),
         tags=["Settings"],
     ),
     create=extend_schema(
@@ -158,7 +171,7 @@ class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
                 value={
                     "to_email": "alerts@example.com",
                     "cc_email": "team@example.com",
-                    "attach_pdf": True
+                    "attach_pdf": True,
                 },
                 request_only=True,
             ),
@@ -174,7 +187,7 @@ class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
                 value={
                     "to_email": "alerts@example.com",
                     "cc_email": "team@example.com",
-                    "attach_pdf": False
+                    "attach_pdf": False,
                 },
                 request_only=True,
             ),
@@ -219,17 +232,36 @@ class SettingsViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="List uploads",
-        description="Retrieve a paginated list of file uploads with filtering and search. Returns summary data for performance.",
+        description=(
+            "Retrieve a paginated list of file uploads with filtering and "
+            "search. Returns summary data for performance."
+        ),
         tags=["Uploads"],
         parameters=[
-            OpenApiParameter(name="status", type=str, description="Filter by upload status (success, failed, processing)"),
-            OpenApiParameter(name="search", type=str, description="Search by filename or status"),
-            OpenApiParameter(name="ordering", type=str, description="Order by: uploaded_at, status, row_count (prefix with - for descending)"),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                description="Filter by upload status (success, failed, processing)",
+            ),
+            OpenApiParameter(
+                name="search", type=str, description="Search by filename or status"
+            ),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=(
+                    "Order by: uploaded_at, status, row_count "
+                    "(prefix with - for descending)"
+                ),
+            ),
         ],
     ),
     retrieve=extend_schema(
         summary="Get upload details",
-        description="Retrieve detailed information for a specific upload including date range and row count.",
+        description=(
+            "Retrieve detailed information for a specific upload including "
+            "date range and row count."
+        ),
         tags=["Uploads"],
     ),
     create=extend_schema(
@@ -242,7 +274,7 @@ class SettingsViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
                 value={
                     "filename": "claims_2024_Q1.csv",
                     "date_min": "2024-01-01",
-                    "date_max": "2024-03-31"
+                    "date_max": "2024-03-31",
                 },
                 request_only=True,
             ),
@@ -274,9 +306,13 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
     serializer_class = UploadSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
     throttle_classes = [BulkOperationThrottle]  # QW-5: Rate limit bulk uploads
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status']
-    search_fields = ['filename', 'status']
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_fields = ["status"]
+    search_fields = ["filename", "status"]
     ordering_fields = ["uploaded_at", "status", "row_count"]
 
     def get_queryset(self):
@@ -295,7 +331,10 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Get upload statistics",
-        description="Retrieve aggregated upload statistics including total uploads, success/failed counts, and total rows processed.",
+        description=(
+            "Retrieve aggregated upload statistics including total uploads, "
+            "success/failed counts, and total rows processed."
+        ),
         tags=["Uploads"],
         responses={
             200: OpenApiExample(
@@ -305,7 +344,7 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
                     "success": 140,
                     "failed": 5,
                     "processing": 5,
-                    "total_rows": 125000
+                    "total_rows": 125000,
                 },
                 response_only=True,
             )
@@ -340,17 +379,54 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="List claim records",
-        description="Retrieve a paginated list of claim records with filtering, search, and ordering. Returns summary data for performance. Rate limited to 2000 requests/hour.",
+        description=(
+            "Retrieve a paginated list of claim records with filtering, "
+            "search, and ordering. Returns summary data for performance. "
+            "Rate limited to 2000 requests/hour."
+        ),
         tags=["Claims"],
         parameters=[
-            OpenApiParameter(name="payer", type=str, description="Filter by payer name"),
-            OpenApiParameter(name="outcome", type=str, description="Filter by claim outcome (PAID, DENIED, OTHER)"),
-            OpenApiParameter(name="submitted_date_after", type=OpenApiTypes.DATE, description="Filter claims submitted after this date (YYYY-MM-DD)"),
-            OpenApiParameter(name="submitted_date_before", type=OpenApiTypes.DATE, description="Filter claims submitted before this date (YYYY-MM-DD)"),
-            OpenApiParameter(name="decided_date_after", type=OpenApiTypes.DATE, description="Filter claims decided after this date (YYYY-MM-DD)"),
-            OpenApiParameter(name="decided_date_before", type=OpenApiTypes.DATE, description="Filter claims decided before this date (YYYY-MM-DD)"),
-            OpenApiParameter(name="search", type=str, description="Search by payer, CPT code, or denial reason code"),
-            OpenApiParameter(name="ordering", type=str, description="Order by: decided_date, submitted_date, payer, outcome (prefix with - for descending)"),
+            OpenApiParameter(
+                name="payer", type=str, description="Filter by payer name"
+            ),
+            OpenApiParameter(
+                name="outcome",
+                type=str,
+                description="Filter by claim outcome (PAID, DENIED, OTHER)",
+            ),
+            OpenApiParameter(
+                name="submitted_date_after",
+                type=OpenApiTypes.DATE,
+                description="Filter claims submitted after this date (YYYY-MM-DD)",
+            ),
+            OpenApiParameter(
+                name="submitted_date_before",
+                type=OpenApiTypes.DATE,
+                description="Filter claims submitted before this date (YYYY-MM-DD)",
+            ),
+            OpenApiParameter(
+                name="decided_date_after",
+                type=OpenApiTypes.DATE,
+                description="Filter claims decided after this date (YYYY-MM-DD)",
+            ),
+            OpenApiParameter(
+                name="decided_date_before",
+                type=OpenApiTypes.DATE,
+                description="Filter claims decided before this date (YYYY-MM-DD)",
+            ),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                description="Search by payer, CPT code, or denial reason code",
+            ),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=(
+                    "Order by: decided_date, submitted_date, payer, outcome "
+                    "(prefix with - for descending)"
+                ),
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -370,9 +446,13 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = ClaimRecordSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
     throttle_classes = [ReadOnlyThrottle]  # QW-5: Liberal rate limit for reads
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_class = ClaimRecordFilter
-    search_fields = ['payer', 'cpt', 'denial_reason_code']
+    search_fields = ["payer", "cpt", "denial_reason_code"]
     ordering_fields = ["decided_date", "submitted_date", "payer", "outcome"]
 
     def get_serializer_class(self):
@@ -518,12 +598,18 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="List report runs",
-        description="Retrieve a paginated list of report runs with their status and drift event counts.",
+        description=(
+            "Retrieve a paginated list of report runs with their status and "
+            "drift event counts."
+        ),
         tags=["Reports"],
     ),
     retrieve=extend_schema(
         summary="Get report run details",
-        description="Retrieve detailed information for a specific report run including all drift events.",
+        description=(
+            "Retrieve detailed information for a specific report run "
+            "including all drift events."
+        ),
         tags=["Reports"],
     ),
 )
@@ -548,7 +634,11 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         summary="Trigger a new report run",
-        description="Trigger a new payer drift report run. Creates a report run and queues async processing to detect payer behavior drift. Rate limited to 10 requests/hour.",
+        description=(
+            "Trigger a new payer drift report run. Creates a report run and "
+            "queues async processing to detect payer behavior drift. "
+            "Rate limited to 10 requests/hour."
+        ),
         tags=["Reports"],
         request=None,
         responses={
@@ -591,21 +681,52 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="List drift events",
-        description="Retrieve a paginated list of drift events with filtering, search, and ordering. Rate limited to 2000 requests/hour.",
+        description=(
+            "Retrieve a paginated list of drift events with filtering, "
+            "search, and ordering. Rate limited to 2000 requests/hour."
+        ),
         tags=["Drift Detection"],
         parameters=[
-            OpenApiParameter(name="payer", type=str, description="Filter by payer name"),
-            OpenApiParameter(name="cpt_group", type=str, description="Filter by CPT group"),
-            OpenApiParameter(name="drift_type", type=str, description="Filter by drift type"),
-            OpenApiParameter(name="severity_min", type=OpenApiTypes.FLOAT, description="Filter by minimum severity (0.0-1.0)"),
-            OpenApiParameter(name="severity_max", type=OpenApiTypes.FLOAT, description="Filter by maximum severity (0.0-1.0)"),
-            OpenApiParameter(name="search", type=str, description="Search by payer, CPT group, or drift type"),
-            OpenApiParameter(name="ordering", type=str, description="Order by: created_at, severity, payer (prefix with - for descending)"),
+            OpenApiParameter(
+                name="payer", type=str, description="Filter by payer name"
+            ),
+            OpenApiParameter(
+                name="cpt_group", type=str, description="Filter by CPT group"
+            ),
+            OpenApiParameter(
+                name="drift_type", type=str, description="Filter by drift type"
+            ),
+            OpenApiParameter(
+                name="severity_min",
+                type=OpenApiTypes.FLOAT,
+                description="Filter by minimum severity (0.0-1.0)",
+            ),
+            OpenApiParameter(
+                name="severity_max",
+                type=OpenApiTypes.FLOAT,
+                description="Filter by maximum severity (0.0-1.0)",
+            ),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                description="Search by payer, CPT group, or drift type",
+            ),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=(
+                    "Order by: created_at, severity, payer "
+                    "(prefix with - for descending)"
+                ),
+            ),
         ],
     ),
     retrieve=extend_schema(
         summary="Get drift event details",
-        description="Retrieve detailed information for a specific drift event including baseline and current values.",
+        description=(
+            "Retrieve detailed information for a specific drift event "
+            "including baseline and current values."
+        ),
         tags=["Drift Detection"],
     ),
 )
@@ -619,18 +740,29 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DriftEventSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
     throttle_classes = [ReadOnlyThrottle]  # QW-5: Liberal rate limit for reads
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
     filterset_class = DriftEventFilter
-    search_fields = ['payer', 'cpt_group', 'drift_type']
-    ordering_fields = ['created_at', 'severity', 'payer']
+    search_fields = ["payer", "cpt_group", "drift_type"]
+    ordering_fields = ["created_at", "severity", "payer"]
 
     @extend_schema(
         summary="Get active drift events",
-        description="Retrieve drift events from the most recent successful report run. Returns paginated results.",
+        description=(
+            "Retrieve drift events from the most recent successful report "
+            "run. Returns paginated results."
+        ),
         tags=["Drift Detection"],
         parameters=[
-            OpenApiParameter(name="page", type=int, description="Page number for pagination"),
-            OpenApiParameter(name="page_size", type=int, description="Number of results per page"),
+            OpenApiParameter(
+                name="page", type=int, description="Page number for pagination"
+            ),
+            OpenApiParameter(
+                name="page_size", type=int, description="Number of results per page"
+            ),
         ],
         responses={200: DriftEventSerializer(many=True)},
     )
@@ -667,7 +799,9 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 @extend_schema_view(
     list=extend_schema(
         summary="List payer mappings",
-        description="Retrieve a list of payer name mappings for normalizing payer names.",
+        description=(
+            "Retrieve a list of payer name mappings for normalizing payer " "names."
+        ),
         tags=["Configuration"],
     ),
     retrieve=extend_schema(
@@ -677,14 +811,17 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     ),
     create=extend_schema(
         summary="Create payer mapping",
-        description="Create a new payer name mapping to normalize raw payer names to standard names.",
+        description=(
+            "Create a new payer name mapping to normalize raw payer names "
+            "to standard names."
+        ),
         tags=["Configuration"],
         examples=[
             OpenApiExample(
                 "Create Payer Mapping",
                 value={
                     "raw_name": "BCBS CA",
-                    "normalized_name": "Blue Cross Blue Shield California"
+                    "normalized_name": "Blue Cross Blue Shield California",
                 },
                 request_only=True,
             ),
@@ -733,15 +870,15 @@ class PayerMappingViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
     ),
     create=extend_schema(
         summary="Create CPT group mapping",
-        description="Create a new CPT code to group mapping for categorizing procedure codes.",
+        description=(
+            "Create a new CPT code to group mapping for categorizing "
+            "procedure codes."
+        ),
         tags=["Configuration"],
         examples=[
             OpenApiExample(
                 "Create CPT Group Mapping",
-                value={
-                    "cpt_code": "99213",
-                    "cpt_group": "Office Visits"
-                },
+                value={"cpt_code": "99213", "cpt_group": "Office Visits"},
                 request_only=True,
             ),
         ],
@@ -785,7 +922,11 @@ class DashboardView(APIView):
 
     @extend_schema(
         summary="Get dashboard overview",
-        description="Retrieve dashboard overview data including claim statistics, upload counts, active drift events, denial rate trends, and top drift payers. Cached for 5 minutes.",
+        description=(
+            "Retrieve dashboard overview data including claim statistics, "
+            "upload counts, active drift events, denial rate trends, and top "
+            "drift payers. Cached for 5 minutes."
+        ),
         tags=["Dashboard"],
         responses={
             200: DashboardSerializer,
@@ -878,9 +1019,9 @@ class DashboardView(APIView):
                 "total_claims": total_claims,
                 "total_uploads": total_uploads,
                 "active_drift_events": active_drift_events,
-                "last_report_date": latest_report.finished_at
-                if latest_report
-                else None,
+                "last_report_date": (
+                    latest_report.finished_at if latest_report else None
+                ),
                 "denial_rate_trend": denial_rate_trend,
                 "top_drift_payers": top_drift_payers,
             }
@@ -895,17 +1036,33 @@ class DashboardView(APIView):
 @extend_schema_view(
     list=extend_schema(
         summary="List alert events",
-        description="Retrieve a paginated list of alert events with operator feedback. Read-only to preserve audit trail.",
+        description=(
+            "Retrieve a paginated list of alert events with operator "
+            "feedback. Read-only to preserve audit trail."
+        ),
         tags=["Alerts"],
         parameters=[
-            OpenApiParameter(name="status", type=str, description="Filter by alert status"),
-            OpenApiParameter(name="search", type=str, description="Search by payer name"),
-            OpenApiParameter(name="ordering", type=str, description="Order by: triggered_at, status (prefix with - for descending)"),
+            OpenApiParameter(
+                name="status", type=str, description="Filter by alert status"
+            ),
+            OpenApiParameter(
+                name="search", type=str, description="Search by payer name"
+            ),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=(
+                    "Order by: triggered_at, status " "(prefix with - for descending)"
+                ),
+            ),
         ],
     ),
     retrieve=extend_schema(
         summary="Get alert event details",
-        description="Retrieve detailed information for a specific alert event including operator judgments.",
+        description=(
+            "Retrieve detailed information for a specific alert event "
+            "including operator judgments."
+        ),
         tags=["Alerts"],
     ),
 )
@@ -922,16 +1079,24 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     )
     serializer_class = AlertEventSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['status']
-    search_fields = ['drift_event__payer']
-    ordering_fields = ['triggered_at', 'status']
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_fields = ["status"]
+    search_fields = ["drift_event__payer"]
+    ordering_fields = ["triggered_at", "status"]
     ordering = ["-triggered_at"]
 
     @action(detail=True, methods=["post"], url_path="feedback")
     @extend_schema(
         summary="Submit operator feedback on an alert",
-        description="Submit operator feedback/judgment on an alert event. Creates or updates an OperatorJudgment record and updates alert status. Logs action to audit trail.",
+        description=(
+            "Submit operator feedback/judgment on an alert event. Creates or "
+            "updates an OperatorJudgment record and updates alert status. "
+            "Logs action to audit trail."
+        ),
         tags=["Alerts"],
         request=OperatorFeedbackSerializer,
         examples=[
@@ -942,7 +1107,7 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
                     "reason_codes": ["payer_policy_change"],
                     "recovered_amount": "5000.00",
                     "recovered_date": "2024-03-15",
-                    "notes": "Contacted payer and confirmed policy change"
+                    "notes": "Contacted payer and confirmed policy change",
                 },
                 request_only=True,
             ),
@@ -951,7 +1116,7 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
                 value={
                     "verdict": "noise",
                     "reason_codes": ["data_quality_issue"],
-                    "notes": "False positive due to incomplete data upload"
+                    "notes": "False positive due to incomplete data upload",
                 },
                 request_only=True,
             ),
@@ -961,9 +1126,7 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
             200: OperatorJudgmentSerializer,
             400: OpenApiExample(
                 "Validation Error",
-                value={
-                    "verdict": ["This field is required."]
-                },
+                value={"verdict": ["This field is required."]},
                 response_only=True,
             ),
         },
@@ -1028,13 +1191,15 @@ class AlertEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
                 "verdict": validated_data["verdict"],
                 "previous_status": old_status,
                 "new_status": alert_event.status,
-                "recovered_amount": str(validated_data.get("recovered_amount"))
-                if validated_data.get("recovered_amount")
-                else None,
+                "recovered_amount": (
+                    str(validated_data.get("recovered_amount"))
+                    if validated_data.get("recovered_amount")
+                    else None
+                ),
                 "action": "created" if created else "updated",
-                "drift_event_id": alert_event.drift_event.id
-                if alert_event.drift_event
-                else None,
+                "drift_event_id": (
+                    alert_event.drift_event.id if alert_event.drift_event else None
+                ),
                 "operator_username": request.user.username,
             },
             related_alert=alert_event,
@@ -1059,7 +1224,11 @@ class WebhookIngestionView(APIView):
 
     @extend_schema(
         summary="Ingest data via webhook",
-        description="Accept webhook payload authenticated with ingestion tokens. Creates durable ingestion records for async processing. Include Authorization: Bearer <token> header.",
+        description=(
+            "Accept webhook payload authenticated with ingestion tokens. "
+            "Creates durable ingestion records for async processing. "
+            "Include Authorization: Bearer <token> header."
+        ),
         tags=["Webhook Ingestion"],
         request={"application/json": dict},
         examples=[
@@ -1073,7 +1242,7 @@ class WebhookIngestionView(APIView):
                             "submitted_date": "2024-01-15",
                             "decided_date": "2024-02-01",
                             "outcome": "PAID",
-                            "allowed_amount": "150.00"
+                            "allowed_amount": "150.00",
                         }
                     ]
                 },
@@ -1086,7 +1255,7 @@ class WebhookIngestionView(APIView):
                 value={
                     "status": "accepted",
                     "ingestion_id": 123,
-                    "message": "Payload received and queued for processing"
+                    "message": "Payload received and queued for processing",
                 },
                 response_only=True,
             ),
@@ -1153,9 +1322,9 @@ class WebhookIngestionView(APIView):
                 payload_metadata={
                     "source": "webhook",
                     "token_name": token.name,
-                    "payload_keys": list(payload.keys())
-                    if isinstance(payload, dict)
-                    else [],
+                    "payload_keys": (
+                        list(payload.keys()) if isinstance(payload, dict) else []
+                    ),
                 },
                 idempotency_key=idempotency_key,
                 record_count=len(payload) if isinstance(payload, list) else 1,
@@ -1194,7 +1363,10 @@ class HealthCheckView(APIView):
 
     @extend_schema(
         summary="API health check",
-        description="Check API health status. Returns application version and current timestamp. No authentication required.",
+        description=(
+            "Check API health status. Returns application version and current "
+            "timestamp. No authentication required."
+        ),
         tags=["Health"],
         responses={
             200: OpenApiExample(
@@ -1202,7 +1374,7 @@ class HealthCheckView(APIView):
                 value={
                     "status": "healthy",
                     "version": "1.0.0",
-                    "timestamp": "2024-03-15T10:30:00Z"
+                    "timestamp": "2024-03-15T10:30:00Z",
                 },
                 response_only=True,
             ),
@@ -1224,7 +1396,11 @@ class HealthCheckView(APIView):
 
 @extend_schema(
     summary="Obtain JWT token pair",
-    description="Obtain access and refresh JWT tokens using username and password. Rate limited to 5 attempts per 15 minutes to prevent brute-force attacks.",
+    description=(
+        "Obtain access and refresh JWT tokens using username and password. "
+        "Rate limited to 5 attempts per 15 minutes to prevent brute-force "
+        "attacks."
+    ),
     tags=["Authentication"],
 )
 class ThrottledTokenObtainPairView(BaseTokenObtainPairView):
@@ -1238,7 +1414,10 @@ class ThrottledTokenObtainPairView(BaseTokenObtainPairView):
 
 @extend_schema(
     summary="Refresh JWT token",
-    description="Refresh an access token using a valid refresh token. Rate limited to prevent abuse.",
+    description=(
+        "Refresh an access token using a valid refresh token. "
+        "Rate limited to prevent abuse."
+    ),
     tags=["Authentication"],
 )
 class ThrottledTokenRefreshView(BaseTokenRefreshView):
@@ -1251,7 +1430,10 @@ class ThrottledTokenRefreshView(BaseTokenRefreshView):
 
 @extend_schema(
     summary="Verify JWT token",
-    description="Verify that a JWT token is valid and not expired. Rate limited to prevent abuse.",
+    description=(
+        "Verify that a JWT token is valid and not expired. "
+        "Rate limited to prevent abuse."
+    ),
     tags=["Authentication"],
 )
 class ThrottledTokenVerifyView(BaseTokenVerifyView):
