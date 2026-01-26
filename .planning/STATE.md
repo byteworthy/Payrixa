@@ -10,28 +10,29 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 2 of 5 (API Pagination & Filtering)
-Plan: Ready to plan
-Status: Phase 1 complete, Phase 2 ready
-Last activity: 2026-01-26 — Phase 1 verified and complete
+Plan: 1 of 2
+Status: In progress
+Last activity: 2026-01-26 — Completed 02-01-PLAN.md (API filtering with django-filter)
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 7.5 min
-- Total execution time: 0.25 hours
+- Total plans completed: 3
+- Average duration: 6 min
+- Total execution time: 0.3 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 2 | 15 min | 7.5 min |
+| 2 | 1 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 12min
-- Trend: Variable (3-12 min range)
+- Last 5 plans: 3min, 3min, 12min
+- Trend: Faster execution (3 min last 2 plans)
 
 *Updated after each plan completion*
 
@@ -51,6 +52,9 @@ Recent decisions affecting current work:
 - Lock customer row instead of dedicated lock table: Simpler design, leverages existing model (01-01)
 - Add IntegrityError handling with locking: Defense in depth strategy (01-01)
 - Fix migrations for SQLite compatibility: Enable test suite without PostgreSQL (01-01)
+- Use django-filter for declarative filtering: Replace hand-rolled filter logic with battle-tested FilterSet classes (02-01)
+- Configure DEFAULT_FILTER_BACKENDS globally: Automatic inheritance with per-ViewSet customization (02-01)
+- Keep CustomerFilterMixin separate from FilterSets: Tenant isolation runs before FilterSet filtering (02-01)
 
 ### Pending Todos
 
@@ -72,9 +76,9 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26 19:30:13 (plan execution)
-Stopped at: Completed 01-01-PLAN.md (Transaction isolation with select_for_update)
+Last session: 2026-01-26 20:04:22 (plan execution)
+Stopped at: Completed 02-01-PLAN.md (API filtering with django-filter)
 Resume file: None
 
 ---
-*Phase 1 complete: 2 of 2 plans complete. Ready for Phase 2.*
+*Phase 2 in progress: 1 of 2 plans complete. Next: 02-02 cursor pagination.*
