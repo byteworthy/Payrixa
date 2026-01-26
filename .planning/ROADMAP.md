@@ -91,11 +91,11 @@ Plans:
   2. Load tests identify performance bottlenecks (database queries, Celery tasks, serialization)
   3. Deployment workflow rollback test passes and validates automated rollback functionality
   4. Performance test suite runs in CI and fails if response time SLAs violated
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md — Create Locust performance test suite and CI integration
+- [ ] 05-02-PLAN.md — Create deployment rollback test and workflow integration
 
 ## Progress
 
@@ -108,4 +108,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. API Pagination & Filtering | 0/2 | Not started | - |
 | 3. OpenAPI Documentation & Error Standardization | 0/TBD | Not started | - |
 | 4. Webhook & RBAC Testing | 0/2 | Not started | - |
-| 5. Performance Testing & Rollback Fix | 0/TBD | Not started | - |
+| 5. Performance Testing & Rollback Fix | 0/2 | Not started | - |
