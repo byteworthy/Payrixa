@@ -93,7 +93,7 @@
         "upstream/integrations/models.py",
         "upstream/migrations/00XX_add_integrationlog_index.py"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }
