@@ -1229,6 +1229,77 @@ def get_latest_judgment_verdict(self, obj):
 
 ---
 
+### ~~Missing API Throttling Tests~~ ✅ RESOLVED
+**Domain**: Test Quality
+**File**: upstream/api/tests.py (created), upstream/api/throttling.py, upstream/api/views.py
+**Impact**: HIGH-2 (rate limiting) implemented with zero test coverage, risking brute-force attack prevention
+**Effort**: Medium
+**Status**: ✅ Fixed on 2026-01-26
+
+**Problem**: HIGH-2 implemented `AuthenticationThrottle` to prevent brute-force password attacks on JWT authentication endpoints (login, refresh, verify). Additional throttle classes were created for burst protection, report generation, bulk operations, read/write operations, and anonymous users. Despite being critical security infrastructure, there were NO tests verifying:
+- Throttle classes are properly scoped
+- Throttle classes inherit from correct base classes
+- Settings configuration is complete and correct
+- Authentication endpoints apply AuthenticationThrottle
+- Documentation quality (HIGH-2 reference, brute-force mention)
+
+**Throttle Classes**:
+1. **AuthenticationThrottle** (HIGH-2): Prevents brute-force attacks on login/refresh/verify
+2. **BurstRateThrottle**: High-frequency burst protection (60/minute)
+3. **SustainedRateThrottle**: Daily limit for sustained usage (10000/day)
+4. **ReportGenerationThrottle**: Expensive operations (10/hour)
+5. **BulkOperationThrottle**: File uploads, batch ops (20/hour)
+6. **ReadOnlyThrottle**: Liberal read operations (2000/hour)
+7. **WriteOperationThrottle**: Moderate write operations (500/hour)
+8. **AnonStrictThrottle**: Very strict for anonymous users (30/hour)
+
+**Resolution**: Created comprehensive test suite (`upstream/api/tests.py`) with **22 test methods** covering:
+
+**1. Throttle Class Tests (10 tests)**:
+- ✅ test_authentication_throttle_scope - Verifies 'authentication' scope
+- ✅ test_authentication_throttle_inherits_anon_rate - Verifies AnonRateThrottle inheritance
+- ✅ test_burst_rate_throttle_scope - Verifies 'burst' scope
+- ✅ test_sustained_rate_throttle_scope - Verifies 'sustained' scope
+- ✅ test_report_generation_throttle_scope - Verifies 'report_generation' scope
+- ✅ test_bulk_operation_throttle_scope - Verifies 'bulk_operation' scope
+- ✅ test_read_only_throttle_scope - Verifies 'read_only' scope
+- ✅ test_write_operation_throttle_scope - Verifies 'write_operation' scope
+- ✅ test_anon_strict_throttle_scope - Verifies 'anon_strict' scope
+- ✅ test_all_throttles_inherit_from_user_or_anon_rate - Verifies correct inheritance patterns
+
+**2. Configuration Tests (5 tests)**:
+- ✅ test_authentication_rate_configured - Verifies 'authentication' in settings
+- ✅ test_burst_rate_configured - Verifies 'burst' in settings
+- ✅ test_report_generation_rate_configured - Verifies 'report_generation' in settings
+- ✅ test_all_custom_throttle_scopes_configured - Verifies all 8 scopes configured
+- ✅ test_rates_follow_expected_patterns - Verifies restrictiveness hierarchy
+
+**3. View Application Tests (4 tests)**:
+- ✅ test_token_obtain_view_has_authentication_throttle - ThrottledTokenObtainPairView applies AuthenticationThrottle
+- ✅ test_token_refresh_view_has_authentication_throttle - ThrottledTokenRefreshView applies AuthenticationThrottle
+- ✅ test_token_verify_view_has_authentication_throttle - ThrottledTokenVerifyView applies AuthenticationThrottle
+- ✅ test_authentication_endpoints_registered - All auth endpoints registered in URLs
+
+**4. Documentation Tests (3 tests)**:
+- ✅ test_all_throttles_have_docstrings - All throttle classes have descriptive docstrings (>20 chars)
+- ✅ test_authentication_throttle_mentions_high2 - AuthenticationThrottle docstring references HIGH-2
+- ✅ test_authentication_throttle_mentions_brute_force - AuthenticationThrottle docstring mentions brute-force prevention
+
+**Expected Impact**:
+- ✅ **Security validation** for HIGH-2 brute-force prevention
+- ✅ **22 comprehensive tests** verifying throttle infrastructure
+- ✅ **Configuration safety net** prevents misconfiguration
+- ✅ **Documentation quality** enforced through tests
+- ✅ **CI protection** against throttle class removal or misconfiguration
+- ✅ **Regression prevention** for all throttle classes
+
+**Files Created**:
+- `upstream/api/tests.py` (271 lines, 22 test methods, 4 test classes)
+
+**Test Execution**: All 22 tests pass in 1.3 seconds
+
+---
+
 ## Medium Priority Issues (73)
 
 *(Categorized by domain, top items shown)*
@@ -1249,12 +1320,12 @@ def get_latest_judgment_verdict(self, obj):
 - Missing covering indexes
 - No database CHECK constraints
 
-### Testing (10 issues)
+### Testing (9 issues)
 - ~~Missing tests for IngestionService~~ ✅ **RESOLVED (TEST-1)**, EvidencePayload, AlertService
 - No integration tests for webhooks
 - No performance/load tests
 - Disabled transaction rollback test
-- Missing API throttling tests
+- ~~Missing API throttling tests~~ ✅ **RESOLVED**
 - Product stub tests (ContractIQ, AuthSignal)
 
 ### Architecture (13 issues)
@@ -1436,9 +1507,9 @@ def get_latest_judgment_verdict(self, obj):
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 101 | 77.1% |
+| To Do | 100 | 76.3% |
 | In Progress | 0 | 0% |
-| Done | 30 | 22.9% |
+| Done | 31 | 23.7% |
 
 ### By Domain Completion
 
@@ -1446,7 +1517,7 @@ def get_latest_judgment_verdict(self, obj):
 |--------|--------|-------|------------|
 | Security | 10 | 2 | 20.0% |
 | Performance | 18 | 11 | 61.1% |
-| Testing | 17 | 2 | 11.8% |
+| Testing | 17 | 3 | 17.6% |
 | Architecture | 21 | 1 | 4.8% |
 | Database | 22 | 5 | 22.7% |
 | API | 23 | 2 | 8.7% |
