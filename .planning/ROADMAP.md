@@ -12,7 +12,7 @@ Phase 3 delivers production-ready database performance and API reliability throu
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Transaction Isolation & Unique Constraints** - Database correctness foundation
+- [x] **Phase 1: Transaction Isolation & Unique Constraints** - Database correctness foundation
 - [ ] **Phase 2: API Pagination & Filtering** - List endpoint usability
 - [ ] **Phase 3: OpenAPI Documentation & Error Standardization** - API developer experience
 - [ ] **Phase 4: Webhook & RBAC Testing** - Integration test coverage
@@ -32,8 +32,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Add transaction isolation with select_for_update() to drift detection
-- [ ] 01-02-PLAN.md — Implement unique constraints via three-phase migrations
+- [x] 01-01-PLAN.md — Add transaction isolation with select_for_update() to drift detection
+- [x] 01-02-PLAN.md — Implement unique constraints via three-phase migrations
 
 ### Phase 2: API Pagination & Filtering
 **Goal**: All API list endpoints support pagination and user-driven filtering for large datasets
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Transaction Isolation & Unique Constraints | 0/2 | Ready | - |
+| 1. Transaction Isolation & Unique Constraints | 2/2 | Complete | 2026-01-26 |
 | 2. API Pagination & Filtering | 0/TBD | Not started | - |
 | 3. OpenAPI Documentation & Error Standardization | 0/TBD | Not started | - |
 | 4. Webhook & RBAC Testing | 0/TBD | Not started | - |
