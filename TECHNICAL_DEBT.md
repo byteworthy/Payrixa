@@ -708,6 +708,59 @@ fi
 
 ---
 
+### ~~HIGH-15: Missing NOT NULL Constraints on Critical Fields~~ ✅ RESOLVED
+**Domain**: Database
+**File**: upstream/models.py:77, 366-367
+**Impact**: Inconsistent schema, potential NULL values in fields that always have values
+**Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
+
+**Problem**: Several critical fields had `null=True` despite always having values due to defaults or auto-population (auto_now_add, auto_now), creating unnecessary NULL checks and schema inconsistency.
+
+**Fields with Inconsistent NULL Settings**:
+- `Upload.file_encoding` - Has `default="utf-8"` but also allows `null=True`
+- `ClaimRecord.processed_at` - Uses `auto_now_add=True` (always sets value) but allows `null=True`
+- `ClaimRecord.updated_at` - Uses `auto_now=True` (always sets value) but allows `null=True`
+
+**Why This is a Problem**:
+- **Schema inconsistency**: Fields that never contain NULL shouldn't allow NULL
+- **Misleading documentation**: `null=True` suggests optional values when they're always set
+- **Missed query optimizations**: Database can't optimize queries knowing fields are NOT NULL
+- **False sense of safety**: Code may check for NULL unnecessarily
+
+**Data Analysis**:
+- Verified zero existing records with NULL values in these fields
+- Safe to add NOT NULL constraints without data migration
+
+**Resolution**:
+- **Upload.file_encoding** (upstream/models.py:77):
+  * Removed `null=True` - field keeps `default="utf-8"` and `blank=True`
+  * Will always have "utf-8" value on creation
+- **ClaimRecord.processed_at** (upstream/models.py:366):
+  * Removed `null=True` - field keeps `auto_now_add=True` and `db_index=True`
+  * Will always be set to current timestamp on creation
+- **ClaimRecord.updated_at** (upstream/models.py:367):
+  * Removed `null=True` - field keeps `auto_now=True`
+  * Will always be updated to current timestamp on every save()
+- **Migration** (upstream/migrations/0008_add_not_null_constraints_high15.py):
+  * Manually created migration with one-off defaults for safety
+  * Uses `preserve_default=False` to avoid keeping migration defaults in schema
+  * Applied successfully with no data migration needed
+- **Testing** (test_not_null_constraints.py):
+  * Comprehensive test suite with 5 passing tests
+  * Verified default values automatically applied
+  * Verified auto_now_add/auto_now behavior preserved
+  * Verified database schema has NOT NULL constraints
+  * Verified model metadata shows null=False
+- **Expected Impact**:
+  * Improved data integrity - explicit NOT NULL prevents invalid states
+  * Better schema documentation - fields explicitly marked as required
+  * Query optimization - database knows fields are NOT NULL
+  * Cleaner code - no need for unnecessary NULL checks
+  * Prevents future bugs from unexpected NULL values
+
+---
+
 ## Medium Priority Issues (76)
 
 *(Categorized by domain, top items shown)*
@@ -722,7 +775,7 @@ fi
 
 ### Database (11 issues)
 - ~~Missing indexes on date range fields~~ ✅ **RESOLVED (HIGH-14)**
-- Missing NOT NULL on critical fields
+- ~~Missing NOT NULL on critical fields~~ ✅ **RESOLVED (HIGH-15)**
 - No transaction isolation for concurrent drift
 - Inefficient count queries
 - Missing covering indexes
@@ -909,15 +962,15 @@ fi
 
 ## Progress Tracking
 
-**Current Status**: Phase 2 - IN PROGRESS (23/43 Critical+High Issues Resolved - 53.5%) 🚧
+**Current Status**: Phase 2 - IN PROGRESS (24/43 Critical+High Issues Resolved - 55.8%) 🚧
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 108 | 82.4% |
+| To Do | 107 | 81.7% |
 | In Progress | 0 | 0% |
-| Done | 23 | 17.6% |
+| Done | 24 | 18.3% |
 
 ### By Domain Completion
 
@@ -927,7 +980,7 @@ fi
 | Performance | 18 | 6 | 33.3% |
 | Testing | 17 | 1 | 5.9% |
 | Architecture | 21 | 1 | 4.8% |
-| Database | 22 | 4 | 18.2% |
+| Database | 22 | 5 | 22.7% |
 | API | 23 | 2 | 8.7% |
 | DevOps | 30 | 7 | 23.3% |
 
@@ -945,7 +998,7 @@ fi
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 - ✅ **CRIT-10**: No rollback strategy in deployments (cloudbuild.yaml, scripts/smoke_test.py)
 
-**Phase 2 - High Priority Issues (14/33 - 42.4%)** 🚧
+**Phase 2 - High Priority Issues (15/33 - 45.5%)** 🚧
 - ✅ **HIGH-1**: JWT token blacklist configuration (upstream/settings/base.py)
 - ✅ **HIGH-2**: Rate limiting on auth endpoints (upstream/api/throttling.py, views.py, urls.py)
 - ✅ **HIGH-3**: N+1 query in AlertEvent processing (upstream/products/delayguard/views.py)
@@ -960,6 +1013,7 @@ fi
 - ✅ **HIGH-12**: Unique constraints on hash fields (upstream/models.py, migrations/0005-0006)
 - ✅ **HIGH-13**: N+1 queries in Upload/ClaimRecord views (upstream/api/views.py, upstream/views/__init__.py, upstream/views_data_quality.py)
 - ✅ **HIGH-14**: Missing database indexes on date fields (upstream/models.py, migrations/0007)
+- ✅ **HIGH-15**: Missing NOT NULL constraints on critical fields (upstream/models.py, migrations/0008)
 
 ---
 

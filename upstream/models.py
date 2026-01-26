@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
+from django.utils import timezone
 from upstream.core.tenant import CustomerScopedManager
 
 
@@ -73,9 +74,8 @@ class Upload(models.Model):
     file_hash = models.CharField(
         max_length=64, blank=True, null=True, help_text="SHA-256 hash for deduplication"
     )
-    file_encoding = models.CharField(
-        max_length=50, blank=True, null=True, default="utf-8"
-    )
+    # HIGH-15: Remove null=True - inconsistent with default="utf-8" (always has value)
+    file_encoding = models.CharField(max_length=50, blank=True, default="utf-8")
 
     # Upload context
     uploaded_by = models.ForeignKey(
@@ -363,8 +363,10 @@ class ClaimRecord(models.Model):
     validation_timestamp = models.DateTimeField(blank=True, null=True)
 
     # Processing metadata
-    processed_at = models.DateTimeField(auto_now_add=True, db_index=True, null=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True)
+    # HIGH-15: Remove null=True - inconsistent with auto_now_add (always sets value)
+    processed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    # HIGH-15: Remove null=True - inconsistent with auto_now (always sets value)
+    updated_at = models.DateTimeField(auto_now=True)
 
     # Source data tracking (for audit trail)
     source_row_number = models.IntegerField(
