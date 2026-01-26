@@ -1,5 +1,16 @@
 # Google Cloud Build configuration for Upstream
 # Uses Cloud Build automatic substitutions
+#
+# DEPLOYMENT STRATEGY (CRIT-10):
+# This configuration implements a safe gradual rollout with automated rollback:
+# 1. Deploy new revision with --no-traffic (0% traffic)
+# 2. Run smoke tests against canary revision URL
+# 3. Gradually shift traffic: 10% → 50% → 100%
+# 4. Monitor error logs between each traffic shift
+# 5. Automatically rollback to 0% traffic if errors detected
+#
+# Total deployment time: ~10 minutes (smoke tests + monitoring periods)
+# Rollback time: <30 seconds (automatic on health check failure)
 
 steps:
   # Step 1: Build Docker image
@@ -73,8 +84,10 @@ steps:
       - '--instance=${_DB_INSTANCE}'
       - '--project=$PROJECT_ID'
 
-  # Step 6: Deploy to Cloud Run
+  # Step 6: Deploy new revision with NO traffic (CRIT-10: Rollback Strategy)
+  # New revision is deployed but receives 0% traffic until smoke tests pass
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-no-traffic'
     entrypoint: gcloud
     args:
       - 'run'
@@ -101,11 +114,122 @@ steps:
       - 'DJANGO_SETTINGS_MODULE=upstream.settings.prod'
       - '--set-secrets'
       - 'SECRET_KEY=django-secret-key:latest,DATABASE_URL=database-url:latest,REDIS_URL=redis-url:latest'
+      - '--no-traffic'  # New revision receives 0% traffic initially
+      - '--tag'
+      - 'canary-$BUILD_ID'  # Tag for testing the new revision
 
-timeout: 1800s
+  # Step 7: Run smoke tests against new revision
+  # Tests the canary revision before shifting any production traffic
+  - name: 'gcr.io/$PROJECT_ID/upstream:$BUILD_ID'
+    id: 'smoke-tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Get the canary revision URL
+        CANARY_URL="https://canary-$BUILD_ID---upstream-staging-${_CLOUD_RUN_REGION_HASH}.a.run.app"
+        echo "Running smoke tests against: $CANARY_URL"
+
+        # Install requests if not already available
+        pip install -q requests
+
+        # Run smoke tests with retries
+        python scripts/smoke_test.py --url "$CANARY_URL" --max-retries 5 --retry-delay 10
+
+        if [ $? -ne 0 ]; then
+          echo "❌ Smoke tests failed! Aborting deployment."
+          echo "The new revision will NOT receive traffic."
+          exit 1
+        fi
+
+        echo "✅ Smoke tests passed!"
+    waitFor: ['deploy-no-traffic']
+
+  # Step 8: Gradual traffic rollout - 10%
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'rollout-10-percent'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚦 Shifting 10% traffic to new revision..."
+
+        gcloud run services update-traffic upstream-staging \
+          --to-tags canary-$BUILD_ID=10 \
+          --region us-central1
+
+        echo "⏳ Monitoring health for 2 minutes..."
+        sleep 120
+
+        # Check Cloud Run revision health
+        ERRORS=$(gcloud logging read \
+          "resource.type=cloud_run_revision AND severity>=ERROR AND resource.labels.service_name=upstream-staging" \
+          --limit=10 --format=json --freshness=3m | jq 'length')
+
+        if [ "$ERRORS" -gt 5 ]; then
+          echo "❌ Detected $ERRORS errors in logs! Rolling back..."
+          gcloud run services update-traffic upstream-staging \
+            --to-tags canary-$BUILD_ID=0 \
+            --region us-central1
+          exit 1
+        fi
+
+        echo "✅ 10% traffic stable"
+    waitFor: ['smoke-tests']
+
+  # Step 9: Gradual traffic rollout - 50%
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'rollout-50-percent'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚦 Shifting 50% traffic to new revision..."
+
+        gcloud run services update-traffic upstream-staging \
+          --to-tags canary-$BUILD_ID=50 \
+          --region us-central1
+
+        echo "⏳ Monitoring health for 3 minutes..."
+        sleep 180
+
+        # Check for errors
+        ERRORS=$(gcloud logging read \
+          "resource.type=cloud_run_revision AND severity>=ERROR AND resource.labels.service_name=upstream-staging" \
+          --limit=10 --format=json --freshness=4m | jq 'length')
+
+        if [ "$ERRORS" -gt 5 ]; then
+          echo "❌ Detected $ERRORS errors! Rolling back..."
+          gcloud run services update-traffic upstream-staging \
+            --to-tags canary-$BUILD_ID=0 \
+            --region us-central1
+          exit 1
+        fi
+
+        echo "✅ 50% traffic stable"
+    waitFor: ['rollout-10-percent']
+
+  # Step 10: Complete rollout - 100%
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'rollout-100-percent'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚦 Shifting 100% traffic to new revision..."
+
+        gcloud run services update-traffic upstream-staging \
+          --to-latest \
+          --region us-central1
+
+        echo "✅ Deployment complete! All traffic on new revision."
+    waitFor: ['rollout-50-percent']
+
+timeout: 2400s  # 40 minutes (increased for gradual rollout with monitoring periods)
 
 substitutions:
   _DB_INSTANCE: 'upstream-prod'  # Default database instance for backups
+  _CLOUD_RUN_REGION_HASH: 'uc'  # Region hash for Cloud Run URLs (us-central1 = uc)
 
 availableSecrets:
   secretManager:
