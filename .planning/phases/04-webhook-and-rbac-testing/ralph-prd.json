@@ -1,0 +1,92 @@
+{
+  "branchName": "phase-04-webhook-rbac-tests",
+  "context": {
+    "phase": "04",
+    "phaseName": "Webhook & RBAC Testing",
+    "phaseGoal": "Integration tests validate webhook delivery and customer isolation across roles",
+    "requirements": ["TEST-01", "TEST-04"],
+    "dependsOn": "Phase 3 (OpenAPI Documentation & Error Standardization)",
+    "successCriteria": [
+      "Webhook tests validate delivery, retry logic, signature validation, and idempotency with real HTTP calls",
+      "RBAC tests confirm superuser can access all customers, customer admin can access own customer, regular user has read-only access",
+      "RBAC tests validate customer isolation (user from Customer A cannot access Customer B data)",
+      "Test suite fails if webhook delivery or retry logic breaks"
+    ],
+    "qualityGates": [
+      "python manage.py check",
+      "python manage.py test upstream.tests_webhooks -v 2",
+      "python manage.py test upstream.tests_rbac -v 2"
+    ]
+  },
+  "userStories": [
+    {
+      "id": 1,
+      "title": "Create webhook integration test infrastructure with mock HTTP server",
+      "description": "Set up test infrastructure for webhook delivery tests using requests-mock or httpretty. Create test utilities for: starting mock HTTP server, capturing webhook payloads, simulating network failures, validating HMAC signatures. Create base test class WebhookTestCase in upstream/tests_webhooks.py with setup/teardown for mock server.",
+      "acceptanceCriteria": [
+        "Mock HTTP server can receive webhook POST requests",
+        "Test utilities can capture and inspect webhook payloads",
+        "Can simulate 200, 500, timeout responses",
+        "HMAC signature validation helper implemented",
+        "Base test class ready for webhook tests"
+      ],
+      "files": [
+        "upstream/tests_webhooks.py",
+        "requirements-dev.txt"
+      ],
+      "passes": false
+    },
+    {
+      "id": 2,
+      "title": "Implement webhook delivery tests for successful delivery and retry logic",
+      "description": "Create test cases that verify: webhook sends POST to configured URL on drift event creation, payload includes event data in JSON format, HMAC signature in X-Webhook-Signature header, successful delivery (200) marks webhook as delivered, failed delivery (500) triggers retry with exponential backoff, max 3 retry attempts, idempotency key prevents duplicate processing.",
+      "acceptanceCriteria": [
+        "Test verifies webhook POST on event creation",
+        "Test validates payload structure and signature",
+        "Test confirms 200 response marks as delivered",
+        "Test verifies retry logic on 500 error",
+        "Test confirms max 3 retries",
+        "Test verifies idempotency with duplicate events",
+        "All webhook tests pass"
+      ],
+      "files": [
+        "upstream/tests_webhooks.py"
+      ],
+      "passes": false
+    },
+    {
+      "id": 3,
+      "title": "Create RBAC test suite with superuser, customer admin, and regular user roles",
+      "description": "Create test class RBACTests in upstream/tests_rbac.py that sets up 3 users: superuser (all access), customer_admin (Customer A), regular_user (Customer A read-only). Create helper methods for authenticating as each user. Test data: Customer A and B with claims, drift events, uploads.",
+      "acceptanceCriteria": [
+        "Test infrastructure sets up 3 user roles",
+        "2 customers with test data (claims, drift events, uploads)",
+        "Helper methods to switch between users",
+        "Base test class with comprehensive setup",
+        "All setup completes without errors"
+      ],
+      "files": [
+        "upstream/tests_rbac.py"
+      ],
+      "passes": false
+    },
+    {
+      "id": 4,
+      "title": "Implement customer isolation tests across all API endpoints",
+      "description": "Create tests verifying: superuser sees all customers' data, customer_admin (Customer A) sees only Customer A data, regular_user (Customer A) cannot access Customer B data, attempting to access Customer B returns 404 (not 403 to avoid leaking existence). Test all ViewSets: ClaimRecord, DriftEvent, Upload, AlertEvent. Verify list, retrieve, and custom actions respect customer isolation.",
+      "acceptanceCriteria": [
+        "Superuser can list/retrieve all customers' data",
+        "Customer A admin cannot see Customer B data (404)",
+        "Regular user has read-only access (cannot POST/PUT/DELETE)",
+        "Customer isolation tested on all 4 ViewSets",
+        "List endpoints filter by customer automatically",
+        "Direct ID access to other customer returns 404",
+        "All RBAC tests pass"
+      ],
+      "files": [
+        "upstream/tests_rbac.py"
+      ],
+      "passes": false
+    }
+  ]
+}

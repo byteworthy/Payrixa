@@ -1,0 +1,90 @@
+{
+  "branchName": "phase-03-api-documentation",
+  "context": {
+    "phase": "03",
+    "phaseName": "OpenAPI Documentation & Error Standardization",
+    "phaseGoal": "Complete API documentation and consistent error handling across all endpoints",
+    "requirements": ["API-03", "API-04"],
+    "dependsOn": "Phase 2 (API Pagination & Filtering)",
+    "successCriteria": [
+      "All endpoints return standardized error responses with status codes, detail messages, and field-level errors",
+      "drf-spectacular generates 100% OpenAPI documentation for all endpoints, actions, and filters",
+      "API documentation includes request/response examples for every endpoint",
+      "Validation errors, authentication errors, and permission errors use consistent format"
+    ],
+    "qualityGates": [
+      "python manage.py check",
+      "python manage.py test upstream.tests_api -v 2",
+      "python manage.py spectacular --validate"
+    ]
+  },
+  "userStories": [
+    {
+      "id": 1,
+      "title": "Create custom exception handler for standardized error responses across all API endpoints",
+      "description": "Implement a custom exception handler in upstream/api/exceptions.py that catches DRF exceptions (ValidationError, NotFound, PermissionDenied, AuthenticationFailed) and returns consistent JSON structure: {\"error\": {\"code\": \"...\", \"message\": \"...\", \"details\": {...}}}. Configure in REST_FRAMEWORK settings. Update existing error responses to use new format.",
+      "acceptanceCriteria": [
+        "Exception handler returns consistent error structure for all exception types",
+        "Validation errors include field-level details",
+        "HTTP status codes match exception types (400, 401, 403, 404, 500)",
+        "Tests verify error format for each exception type"
+      ],
+      "files": [
+        "upstream/api/exceptions.py",
+        "upstream/settings/base.py",
+        "upstream/tests_api.py"
+      ],
+      "passes": false
+    },
+    {
+      "id": 2,
+      "title": "Add @extend_schema annotations to all ViewSet actions with request/response examples",
+      "description": "Use drf-spectacular's @extend_schema decorator on all ViewSet methods (list, retrieve, create, update, destroy) and custom actions (payer_summary, feedback, dashboard, active). Include summary, description, request_body examples, response examples with status codes, and parameter descriptions. Ensure all custom actions document pagination and filter parameters.",
+      "acceptanceCriteria": [
+        "All ViewSet methods have @extend_schema annotations",
+        "Each action includes summary and description",
+        "Request/response examples provided for POST/PUT endpoints",
+        "Filter and pagination parameters documented on custom actions",
+        "python manage.py spectacular --validate passes"
+      ],
+      "files": [
+        "upstream/api/views.py",
+        "upstream/api/serializers.py"
+      ],
+      "passes": false
+    },
+    {
+      "id": 3,
+      "title": "Generate OpenAPI schema and verify 100% endpoint coverage with examples",
+      "description": "Run python manage.py spectacular --file schema.yaml and verify all endpoints are documented. Check that schema includes: all CRUD operations, custom actions, filter parameters, search parameters, pagination parameters, authentication requirements, and error response schemas. Add any missing @extend_schema annotations. Verify schema validation passes.",
+      "acceptanceCriteria": [
+        "schema.yaml generated without errors",
+        "All 20+ API endpoints present in schema",
+        "Filter/search/pagination parameters documented",
+        "Error response schemas included",
+        "Authentication/permission requirements specified",
+        "python manage.py spectacular --validate passes"
+      ],
+      "files": [
+        "schema.yaml"
+      ],
+      "passes": false
+    },
+    {
+      "id": 4,
+      "title": "Add comprehensive API error handling tests for all exception types",
+      "description": "Create test class ErrorHandlingTests in upstream/tests_api.py that verifies standardized error format for: validation errors (invalid data), authentication errors (missing/invalid token), permission errors (unauthorized access), not found errors (invalid IDs), and server errors (unexpected exceptions). Test field-level error details in validation responses.",
+      "acceptanceCriteria": [
+        "Tests cover all 5 exception types (validation, auth, permission, 404, 500)",
+        "Each test verifies error response structure matches standard format",
+        "Validation error test checks field-level details",
+        "All tests pass",
+        "Test coverage for error handling >= 90%"
+      ],
+      "files": [
+        "upstream/tests_api.py"
+      ],
+      "passes": false
+    }
+  ]
+}

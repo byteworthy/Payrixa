@@ -1,0 +1,95 @@
+{
+  "branchName": "phase-05-performance-rollback",
+  "context": {
+    "phase": "05",
+    "phaseName": "Performance Testing & Rollback Fix",
+    "phaseGoal": "Load testing validates production performance targets and deployment rollback automation works",
+    "requirements": ["TEST-02", "TEST-03"],
+    "dependsOn": "Phase 4 (Webhook & RBAC Testing)",
+    "successCriteria": [
+      "Locust load tests validate p95 response times <500ms for key endpoints under realistic load",
+      "Load tests identify performance bottlenecks (database queries, Celery tasks, serialization)",
+      "Deployment workflow rollback test passes and validates automated rollback functionality",
+      "Performance test suite runs in CI and fails if response time SLAs violated"
+    ],
+    "qualityGates": [
+      "python manage.py check",
+      "locust -f upstream/tests_performance.py --headless -u 10 -r 2 -t 30s --host http://localhost:8000",
+      "python -m pytest .github/workflows/test_rollback.py -v"
+    ]
+  },
+  "userStories": [
+    {
+      "id": 1,
+      "title": "Create Locust performance test suite with realistic user scenarios",
+      "description": "Install locust in requirements-dev.txt. Create upstream/tests_performance.py with Locust tasks for: list claims (GET /api/v1/claims/), retrieve claim detail, filter claims by payer, search claims, get payer_summary, list drift events, filter by severity. Configure realistic user behavior with wait times. Set performance targets: p95 < 500ms for list endpoints, p95 < 200ms for detail endpoints.",
+      "acceptanceCriteria": [
+        "Locust test file with 7+ realistic tasks",
+        "Tasks include authentication headers",
+        "Wait times between requests (1-5 seconds)",
+        "Performance targets documented in test file",
+        "Can run headless with --headless flag",
+        "Test completes without errors"
+      ],
+      "files": [
+        "upstream/tests_performance.py",
+        "requirements-dev.txt"
+      ],
+      "passes": false
+    },
+    {
+      "id": 2,
+      "title": "Run load tests and identify performance bottlenecks with Django Debug Toolbar",
+      "description": "Run locust tests with 10 concurrent users for 5 minutes. Capture p50, p95, p99 response times for each endpoint. Enable Django Debug Toolbar in dev to identify N+1 queries, slow queries, and serialization bottlenecks. Document findings in .planning/phases/05-.../PERFORMANCE-REPORT.md with: endpoint latencies, query counts, bottleneck analysis, optimization recommendations.",
+      "acceptanceCriteria": [
+        "Load test runs successfully with 10 concurrent users",
+        "Performance metrics captured for all endpoints",
+        "Bottlenecks identified (queries, serialization, cache)",
+        "PERFORMANCE-REPORT.md created with findings",
+        "Recommendations prioritized by impact",
+        "All endpoints meet p95 < 500ms target or have optimization plan"
+      ],
+      "files": [
+        ".planning/phases/05-performance-testing-and-rollback-fix/PERFORMANCE-REPORT.md"
+      ],
+      "passes": false
+    },
+    {
+      "id": 3,
+      "title": "Integrate Locust tests into CI with performance SLA thresholds",
+      "description": "Add performance test step to .github/workflows/test.yml that runs Locust in headless mode. Configure to fail build if: p95 > 500ms for list endpoints, p95 > 200ms for detail endpoints, any endpoint has >10 database queries, error rate >1%. Use locust --expect-workers flag and parse output for thresholds. Add performance test badge to README.",
+      "acceptanceCriteria": [
+        "CI workflow includes performance test step",
+        "Tests run against test database with fixtures",
+        "SLA thresholds configured and enforced",
+        "Build fails if thresholds exceeded",
+        "Performance results logged in CI output",
+        "README badge shows performance status"
+      ],
+      "files": [
+        ".github/workflows/test.yml",
+        "README.md"
+      ],
+      "passes": false
+    },
+    {
+      "id": 4,
+      "title": "Fix deployment rollback test in GitHub Actions workflow",
+      "description": "Review existing disabled rollback test in .github/workflows/deploy.yml (or create new test file .github/workflows/test_rollback.py). Implement test that: deploys to staging, runs health check, simulates deployment failure, triggers automatic rollback to previous version, verifies rollback completes successfully, confirms app returns to healthy state. Re-enable test in CI.",
+      "acceptanceCriteria": [
+        "Rollback test script exists and is executable",
+        "Test deploys to staging environment",
+        "Simulates realistic failure scenario",
+        "Verifies automatic rollback triggers",
+        "Confirms app returns to working state",
+        "Test passes consistently in CI",
+        "Rollback test re-enabled in workflow"
+      ],
+      "files": [
+        ".github/workflows/deploy.yml",
+        ".github/workflows/test_rollback.py"
+      ],
+      "passes": false
+    }
+  ]
+}
