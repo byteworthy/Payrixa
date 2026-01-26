@@ -21,6 +21,7 @@ from django.db import transaction
 from django.utils import timezone
 from upstream.models import Customer
 from upstream.ingestion.services import publish_event
+from upstream.metrics import drift_computation_time
 import logging
 
 logger = logging.getLogger(__name__)
@@ -112,49 +113,52 @@ class BaseDriftDetectionService(ABC):
         Returns:
             ComputationResult with signals_created, aggregates_created, and windows
         """
-        # Step 1: Compute time windows
-        baseline_window, current_window = self._compute_time_windows(
-            start_date, end_date
-        )
-
-        logger.info(
-            f"{self.__class__.__name__}: Computing drift for {self.customer.name} "
-            f"(baseline: {baseline_window['start']} to {baseline_window['end']}, "
-            f"current: {current_window['start']} to {current_window['end']})"
-        )
-
-        # Step 2-4: Transaction-wrapped computation
-        with transaction.atomic():
-            # Compute aggregates
-            aggregates = self._compute_aggregates(
-                start_date=baseline_window['start'],
-                end_date=current_window['end'],
-                **kwargs
+        # Track drift computation time
+        product_name = self._get_product_name()
+        with drift_computation_time.labels(product=product_name).time():
+            # Step 1: Compute time windows
+            baseline_window, current_window = self._compute_time_windows(
+                start_date, end_date
             )
-            aggregates_created = len(aggregates) if isinstance(aggregates, list) else aggregates
 
-            # Detect signals
-            signals = self._detect_signals(
+            logger.info(
+                f"{self.__class__.__name__}: Computing drift for {self.customer.name} "
+                f"(baseline: {baseline_window['start']} to {baseline_window['end']}, "
+                f"current: {current_window['start']} to {current_window['end']})"
+            )
+
+            # Step 2-4: Transaction-wrapped computation
+            with transaction.atomic():
+                # Compute aggregates
+                aggregates = self._compute_aggregates(
+                    start_date=baseline_window['start'],
+                    end_date=current_window['end'],
+                    **kwargs
+                )
+                aggregates_created = len(aggregates) if isinstance(aggregates, list) else aggregates
+
+                # Detect signals
+                signals = self._detect_signals(
+                    baseline_window=baseline_window,
+                    current_window=current_window,
+                    **kwargs
+                )
+                signals_created = len(signals) if isinstance(signals, list) else signals
+
+                # Publish audit event
+                self._publish_computation_event(
+                    signals_created=signals_created,
+                    aggregates_created=aggregates_created
+                )
+
+            # Step 5: Return structured results
+            return ComputationResult(
+                signals_created=signals_created,
+                aggregates_created=aggregates_created,
                 baseline_window=baseline_window,
                 current_window=current_window,
-                **kwargs
+                metadata=self._get_result_metadata(signals_created, aggregates_created)
             )
-            signals_created = len(signals) if isinstance(signals, list) else signals
-
-            # Publish audit event
-            self._publish_computation_event(
-                signals_created=signals_created,
-                aggregates_created=aggregates_created
-            )
-
-        # Step 5: Return structured results
-        return ComputationResult(
-            signals_created=signals_created,
-            aggregates_created=aggregates_created,
-            baseline_window=baseline_window,
-            current_window=current_window,
-            metadata=self._get_result_metadata(signals_created, aggregates_created)
-        )
 
     def _compute_time_windows(
         self,

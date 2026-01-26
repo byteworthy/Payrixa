@@ -23,6 +23,13 @@ from upstream.constants import (
     COLOR_HIGH,
     COLOR_LOW,
 )
+from upstream.metrics import (
+    track_alert_created,
+    track_alert_delivered,
+    alert_failed,
+    alert_suppressed,
+    alert_processing_time,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +74,15 @@ def evaluate_drift_event(drift_event):
             )
             alert_events.append(alert_event)
             logger.info(f"Alert triggered: {rule.name} for drift event {drift_event.id}")
-            
+
+            # Track alert creation metric
+            severity_level = 'high' if drift_event.severity >= 0.7 else 'medium' if drift_event.severity >= 0.4 else 'low'
+            track_alert_created(
+                product='DriftWatch',
+                severity=severity_level,
+                customer_id=drift_event.customer.id
+            )
+
             # Create audit event
             create_audit_event(
                 action='alert_event_created',
@@ -154,6 +169,13 @@ def evaluate_payment_delay_signal(payment_delay_signal):
 
     logger.info(f"DelayGuard alert created for {payment_delay_signal.payer}: +{payment_delay_signal.delta_days:.1f} days")
 
+    # Track alert creation metric
+    track_alert_created(
+        product='DelayGuard',
+        severity=payment_delay_signal.severity,
+        customer_id=payment_delay_signal.customer.id
+    )
+
     # Create audit event
     create_audit_event(
         action='alert_event_created',
@@ -201,68 +223,107 @@ def send_alert_notification(alert_event):
         [alert_event.drift_event] if alert_event.drift_event else [],
     )
 
-    if _is_suppressed(alert_event.customer, evidence_payload):
+    suppression_reason = _get_suppression_reason(alert_event.customer, evidence_payload)
+    if suppression_reason:
         alert_event.status = 'sent'
         alert_event.notification_sent_at = timezone.now()
         alert_event.error_message = 'suppressed'
         alert_event.save()
-        logger.info(f"Alert event {alert_event.id} suppressed within cooldown window")
+
+        # Track alert suppression metric
+        product_name = evidence_payload.get('product_name', 'Unknown')
+        alert_suppressed.labels(
+            product=product_name,
+            reason=suppression_reason,
+            customer_id=str(alert_event.customer.id)
+        ).inc()
+
+        logger.info(f"Alert event {alert_event.id} suppressed: {suppression_reason}")
         return True
     
     success = False
     error_message = None
-    
-    try:
-        for channel in channels:
-            if channel.channel_type == 'email':
-                success = send_email_notification(alert_event, channel, evidence_payload)
-            elif channel.channel_type == 'slack':
-                success = send_slack_notification(alert_event, channel)
-            elif channel.channel_type == 'webhook':
-                # Webhook handled separately by send_webhooks command
-                logger.info(f"Skipping webhook channel {channel.id} - handled by send_webhooks command")
-        
-        if not channels.exists():
-            success = send_default_email_notification(alert_event, evidence_payload)
-        
-        if success:
-            alert_event.status = 'sent'
-            alert_event.notification_sent_at = timezone.now()
-            alert_event.error_message = None
+    product_name = alert_event.payload.get('product_name', 'Unknown')
+
+    # Track alert processing time
+    with alert_processing_time.labels(product=product_name).time():
+        try:
+            for channel in channels:
+                if channel.channel_type == 'email':
+                    success = send_email_notification(alert_event, channel, evidence_payload)
+                    if success:
+                        track_alert_delivered(
+                            product=product_name,
+                            channel_type='email',
+                            customer_id=alert_event.customer.id
+                        )
+                elif channel.channel_type == 'slack':
+                    success = send_slack_notification(alert_event, channel)
+                    if success:
+                        track_alert_delivered(
+                            product=product_name,
+                            channel_type='slack',
+                            customer_id=alert_event.customer.id
+                        )
+                elif channel.channel_type == 'webhook':
+                    # Webhook handled separately by send_webhooks command
+                    logger.info(f"Skipping webhook channel {channel.id} - handled by send_webhooks command")
+
+            if not channels.exists():
+                success = send_default_email_notification(alert_event, evidence_payload)
+                if success:
+                    track_alert_delivered(
+                        product=product_name,
+                        channel_type='email',
+                        customer_id=alert_event.customer.id
+                    )
+
+            if success:
+                alert_event.status = 'sent'
+                alert_event.notification_sent_at = timezone.now()
+                alert_event.error_message = None
+                alert_event.save()
+
+                # Create audit event for successful send
+                create_audit_event(
+                    action='alert_event_sent',
+                    entity_type='AlertEvent',
+                    entity_id=alert_event.id,
+                    customer=alert_event.customer,
+                    metadata={
+                        'alert_rule': alert_event.alert_rule.name,
+                        'payer': alert_event.payload.get('payer'),
+                        'notification_sent_at': alert_event.notification_sent_at.isoformat()
+                    }
+                )
+                logger.info(f"Alert event {alert_event.id} sent successfully")
+        except Exception as e:
+            error_message = str(e)
+            alert_event.status = 'failed'
+            alert_event.error_message = error_message
             alert_event.save()
-            
-            # Create audit event for successful send
+
+            # Track alert failure metric
+            alert_failed.labels(
+                product=product_name,
+                channel_type='unknown',
+                error_type=e.__class__.__name__,
+                customer_id=str(alert_event.customer.id)
+            ).inc()
+
+            # Create audit event for failed send
             create_audit_event(
-                action='alert_event_sent',
+                action='alert_event_failed',
                 entity_type='AlertEvent',
                 entity_id=alert_event.id,
                 customer=alert_event.customer,
                 metadata={
                     'alert_rule': alert_event.alert_rule.name,
-                    'payer': alert_event.payload.get('payer'),
-                    'notification_sent_at': alert_event.notification_sent_at.isoformat()
+                    'error_message': error_message
                 }
             )
-            logger.info(f"Alert event {alert_event.id} sent successfully")
-    except Exception as e:
-        error_message = str(e)
-        alert_event.status = 'failed'
-        alert_event.error_message = error_message
-        alert_event.save()
-        
-        # Create audit event for failed send
-        create_audit_event(
-            action='alert_event_failed',
-            entity_type='AlertEvent',
-            entity_id=alert_event.id,
-            customer=alert_event.customer,
-            metadata={
-                'alert_rule': alert_event.alert_rule.name,
-                'error_message': error_message
-            }
-        )
-        logger.error(f"Alert event {alert_event.id} failed: {error_message}")
-        success = False
+            logger.error(f"Alert event {alert_event.id} failed: {error_message}")
+            success = False
     
     return success
 
@@ -389,22 +450,23 @@ def _severity_label(severity_value):
     return 'low'
 
 
-def _is_suppressed(customer, evidence_payload):
+def _get_suppression_reason(customer, evidence_payload):
     """
-    Check if an alert should be suppressed based on:
-    1. Time-based cooldown (4 hours)
-    2. Operator judgments (marked as "noise")
+    Check if an alert should be suppressed and return the reason.
+
+    Returns:
+        str: Suppression reason ('cooldown' or 'noise_pattern') if suppressed, None otherwise
     """
     from upstream.alerts.models import OperatorJudgment
 
     if not evidence_payload:
-        return False
+        return None
 
     product_name = evidence_payload.get('product_name')
     signal_type = evidence_payload.get('signal_type')
     entity_label = evidence_payload.get('entity_label')
 
-    # Check 1: Time-based cooldown suppression (existing logic)
+    # Check 1: Time-based cooldown suppression
     window_start = timezone.now() - ALERT_SUPPRESSION_COOLDOWN
     recent_alert = AlertEvent.objects.filter(
         customer=customer,
@@ -417,7 +479,7 @@ def _is_suppressed(customer, evidence_payload):
 
     if recent_alert:
         logger.info(f"Alert suppressed: cooldown window (entity={entity_label}, signal={signal_type})")
-        return True
+        return 'cooldown'
 
     # Check 2: Operator noise judgment suppression
     # Look for similar alerts marked as "noise" in the configured window
@@ -442,9 +504,21 @@ def _is_suppressed(customer, evidence_payload):
                 f"Alert suppressed: operator noise pattern "
                 f"(entity={entity_label}, signal={signal_type}, noise_count={noise_count})"
             )
-            return True
+            return 'noise_pattern'
 
-    return False
+    return None
+
+
+def _is_suppressed(customer, evidence_payload):
+    """
+    Check if an alert should be suppressed based on:
+    1. Time-based cooldown (4 hours)
+    2. Operator judgments (marked as "noise")
+
+    Returns:
+        bool: True if suppressed, False otherwise
+    """
+    return _get_suppression_reason(customer, evidence_payload) is not None
 
 def send_slack_notification(alert_event, channel):
     """Send Slack notification via webhook."""

@@ -29,6 +29,7 @@ from django.utils import timezone
 
 from upstream.models import ClaimRecord, Customer
 from upstream.ingestion.services import publish_event
+from upstream.metrics import payment_delay_signal_created
 from upstream.products.delayguard import (
     DELAYGUARD_CURRENT_WINDOW_DAYS,
     DELAYGUARD_BASELINE_WINDOW_DAYS,
@@ -877,6 +878,12 @@ class DelayGuardComputationService:
             data_quality_warnings=self.data_quality_warnings,
             details=details,
         )
+
+        # Track payment delay signal metric
+        payment_delay_signal_created.labels(
+            severity=severity,
+            customer_id=str(self.customer.id)
+        ).inc()
 
         if aggregates:
             signal.related_aggregates.add(*aggregates)

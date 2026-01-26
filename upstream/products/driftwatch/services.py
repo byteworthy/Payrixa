@@ -23,6 +23,7 @@ from typing import Dict, List, Tuple
 
 from upstream.models import ClaimRecord, DriftEvent, ReportRun
 from upstream.ingestion.services import publish_event
+from upstream.metrics import track_drift_event
 from upstream.constants import (
     PROCESSING_TIME_DRIFT_THRESHOLD_DAYS,
     PROCESSING_TIME_DRIFT_NORMALIZATION_DIVISOR,
@@ -200,6 +201,14 @@ class DriftWatchSignalService:
                     ],
                 )
 
+                # Track drift event metric
+                track_drift_event(
+                    product='DriftWatch',
+                    drift_type='DENIAL_RATE',
+                    severity=float(severity),
+                    customer_id=self.customer.id
+                )
+
                 signals.append(signal)
 
                 # Publish event
@@ -286,6 +295,14 @@ class DriftWatchSignalService:
                     ],
                 )
 
+                # Track drift event metric
+                track_drift_event(
+                    product='DriftWatch',
+                    drift_type='PAYMENT_AMOUNT',
+                    severity=float(severity),
+                    customer_id=self.customer.id
+                )
+
                 signals.append(signal)
                 self._publish_drift_event(signal, "Underpayment Variance")
 
@@ -364,6 +381,14 @@ class DriftWatchSignalService:
                     ],
                 )
 
+                # Track drift event metric
+                track_drift_event(
+                    product='DriftWatch',
+                    drift_type='PROCESSING_DELAY',
+                    severity=float(severity),
+                    customer_id=self.customer.id
+                )
+
                 signals.append(signal)
                 self._publish_drift_event(signal, "Payment Delay")
 
@@ -437,6 +462,14 @@ class DriftWatchSignalService:
                     ],
                 )
 
+                # Track drift event metric
+                track_drift_event(
+                    product='DriftWatch',
+                    drift_type='AUTH_FAILURE_RATE',
+                    severity=float(severity),
+                    customer_id=self.customer.id
+                )
+
                 signals.append(signal)
                 self._publish_drift_event(signal, "Authorization Failure Spike")
 
@@ -499,6 +532,14 @@ class DriftWatchSignalService:
                     current_sample_size=current_data["total"],
                     statistical_significance=p_value,
                     trend_direction="degrading",
+                )
+
+                # Track drift event metric
+                track_drift_event(
+                    product='DriftWatch',
+                    drift_type='APPROVAL_RATE',
+                    severity=float(severity),
+                    customer_id=self.customer.id
                 )
 
                 signals.append(signal)
@@ -565,6 +606,14 @@ class DriftWatchSignalService:
                     current_sample_size=current_data["count"],
                     baseline_std_dev=baseline_data.get("std_dev"),
                     trend_direction="degrading",
+                )
+
+                # Track drift event metric
+                track_drift_event(
+                    product='DriftWatch',
+                    drift_type='DECISION_TIME',
+                    severity=float(severity),
+                    customer_id=self.customer.id
                 )
 
                 signals.append(signal)
