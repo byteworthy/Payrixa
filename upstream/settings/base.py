@@ -63,6 +63,7 @@ MIDDLEWARE = [
     "upstream.middleware.ProductEnablementMiddleware",
     "auditlog.middleware.AuditlogMiddleware",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
+    "upstream.middleware.ApiVersionMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 

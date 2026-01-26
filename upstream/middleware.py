@@ -20,7 +20,7 @@ _request_id_storage = threading.local()
 
 def get_request_id() -> Optional[str]:
     """Get the current request ID from thread-local storage."""
-    return getattr(_request_id_storage, 'request_id', None)
+    return getattr(_request_id_storage, "request_id", None)
 
 
 def set_request_id(request_id: Optional[str]) -> None:
@@ -31,14 +31,14 @@ def set_request_id(request_id: Optional[str]) -> None:
 class RequestIdMiddleware(MiddlewareMixin):
     """
     Middleware to add request ID to each request.
-    
+
     If X-Request-Id header exists, use it. Otherwise, generate a UUID.
     The request_id is attached to request.request_id for access in views.
     """
-    
+
     def process_request(self, request: HttpRequest) -> None:
         """Add request_id to the request object."""
-        request_id = request.META.get('HTTP_X_REQUEST_ID')
+        request_id = request.META.get("HTTP_X_REQUEST_ID")
 
         if not request_id:
             request_id = str(uuid.uuid4())
@@ -48,11 +48,13 @@ class RequestIdMiddleware(MiddlewareMixin):
 
         return None
 
-    def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
+    def process_response(
+        self, request: HttpRequest, response: HttpResponse
+    ) -> HttpResponse:
         """Add request_id to response headers."""
-        request_id = getattr(request, 'request_id', None)
+        request_id = getattr(request, "request_id", None)
         if request_id:
-            response['X-Request-Id'] = request_id
+            response["X-Request-Id"] = request_id
 
         set_request_id(None)
 
@@ -62,29 +64,29 @@ class RequestIdMiddleware(MiddlewareMixin):
 class SimpleRateLimitMiddleware(MiddlewareMixin):
     """
     Simple rate limiting middleware.
-    
+
     Tracks requests per IP address in memory.
     Not suitable for distributed systems - use Redis-based solution for production.
     """
-    
+
     # In-memory storage: {ip: [(timestamp, path), ...]}
     _request_log = defaultdict(list)
     _cleanup_interval = 60  # Clean up old entries every 60 seconds
     _last_cleanup = time.time()
-    
+
     def process_request(self, request: HttpRequest) -> Optional[HttpResponse]:
         """Check rate limits before processing request."""
         # Skip rate limiting for certain paths
-        if request.path.startswith('/static/') or request.path.startswith('/admin/'):
+        if request.path.startswith("/static/") or request.path.startswith("/admin/"):
             return None
 
         # Get rate limit settings
-        rate_limit_enabled = getattr(settings, 'RATE_LIMIT_ENABLED', True)
+        rate_limit_enabled = getattr(settings, "RATE_LIMIT_ENABLED", True)
         if not rate_limit_enabled:
             return None
 
-        max_requests = getattr(settings, 'RATE_LIMIT_MAX_REQUESTS', 100)
-        window_seconds = getattr(settings, 'RATE_LIMIT_WINDOW_SECONDS', 60)
+        max_requests = getattr(settings, "RATE_LIMIT_MAX_REQUESTS", 100)
+        window_seconds = getattr(settings, "RATE_LIMIT_WINDOW_SECONDS", 60)
 
         # Get client IP
         ip_address = self._get_client_ip(request)
@@ -97,14 +99,17 @@ class SimpleRateLimitMiddleware(MiddlewareMixin):
 
         # Get recent requests for this IP
         recent_requests = [
-            (ts, path) for ts, path in self._request_log[ip_address]
+            (ts, path)
+            for ts, path in self._request_log[ip_address]
             if current_time - ts < window_seconds
         ]
 
         # Check if rate limit exceeded
         if len(recent_requests) >= max_requests:
-            response = HttpResponse('Rate limit exceeded. Please try again later.', status=429)
-            response['Retry-After'] = str(window_seconds)
+            response = HttpResponse(
+                "Rate limit exceeded. Please try again later.", status=429
+            )
+            response["Retry-After"] = str(window_seconds)
             return response
 
         # Log this request
@@ -114,11 +119,11 @@ class SimpleRateLimitMiddleware(MiddlewareMixin):
 
     def _get_client_ip(self, request: HttpRequest) -> str:
         """Extract client IP from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0].strip()
+            ip = x_forwarded_for.split(",")[0].strip()
         else:
-            ip = request.META.get('REMOTE_ADDR', 'unknown')
+            ip = request.META.get("REMOTE_ADDR", "unknown")
         return ip
 
     def _cleanup_old_entries(self, window_seconds: Union[int, float]) -> None:
@@ -126,7 +131,8 @@ class SimpleRateLimitMiddleware(MiddlewareMixin):
         current_time = time.time()
         for ip in list(self._request_log.keys()):
             self._request_log[ip] = [
-                (ts, path) for ts, path in self._request_log[ip]
+                (ts, path)
+                for ts, path in self._request_log[ip]
                 if current_time - ts < window_seconds
             ]
             if not self._request_log[ip]:
@@ -135,21 +141,23 @@ class SimpleRateLimitMiddleware(MiddlewareMixin):
 
 class ProductEnablementMiddleware(MiddlewareMixin):
     """Attach enabled product slugs to the request for navigation gating."""
+
     def process_request(self, request: HttpRequest) -> None:
         request.enabled_products = set()
 
         if not request.user.is_authenticated:
             return None
 
-        if not hasattr(request.user, 'profile') or not request.user.profile.customer:
+        if not hasattr(request.user, "profile") or not request.user.profile.customer:
             return None
 
         from upstream.core.models import ProductConfig
+
         customer = request.user.profile.customer
         all_configs = ProductConfig.objects.filter(customer=customer)
 
         if not all_configs.exists():
-            request.enabled_products = {'upstream-core'}
+            request.enabled_products = {"upstream-core"}
             return None
 
         enabled_configs = all_configs.filter(enabled=True)
@@ -172,9 +180,11 @@ class RequestTimingMiddleware(MiddlewareMixin):
         request._request_start_time = time.time()
         return None
 
-    def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
+    def process_response(
+        self, request: HttpRequest, response: HttpResponse
+    ) -> HttpResponse:
         """Log timing when request completes."""
-        if hasattr(request, '_request_start_time'):
+        if hasattr(request, "_request_start_time"):
             duration = time.time() - request._request_start_time
             duration_ms = duration * 1000
 
@@ -182,33 +192,48 @@ class RequestTimingMiddleware(MiddlewareMixin):
             method = request.method
             path = request.path
             status = response.status_code
-            user = request.user.username if hasattr(request, 'user') and request.user.is_authenticated else 'anonymous'
+            user = (
+                request.user.username
+                if hasattr(request, "user") and request.user.is_authenticated
+                else "anonymous"
+            )
 
             # Log with appropriate level based on duration
             if duration > 5.0:
-                logger.error(f"VERY SLOW REQUEST: {method} {path} - {status} - {duration_ms:.0f}ms - user={user}")
+                logger.error(
+                    f"VERY SLOW REQUEST: {method} {path} - {status} - "
+                    f"{duration_ms:.0f}ms - user={user}"
+                )
             elif duration > 2.0:
-                logger.warning(f"SLOW REQUEST: {method} {path} - {status} - {duration_ms:.0f}ms - user={user}")
+                logger.warning(
+                    f"SLOW REQUEST: {method} {path} - {status} - "
+                    f"{duration_ms:.0f}ms - user={user}"
+                )
             else:
-                logger.debug(f"REQUEST: {method} {path} - {status} - {duration_ms:.0f}ms - user={user}")
+                logger.debug(
+                    f"REQUEST: {method} {path} - {status} - "
+                    f"{duration_ms:.0f}ms - user={user}"
+                )
 
             # Add timing header to response
-            response['X-Request-Duration-Ms'] = f"{duration_ms:.2f}"
+            response["X-Request-Duration-Ms"] = f"{duration_ms:.2f}"
 
             # Store metrics in cache for dashboard (keep last 100 requests)
             try:
-                metrics_key = 'metrics:recent_requests'
+                metrics_key = "metrics:recent_requests"
                 recent_requests = cache.get(metrics_key, [])
 
                 # Add this request
-                recent_requests.append({
-                    'timestamp': time.time(),
-                    'method': method,
-                    'path': path,
-                    'status': status,
-                    'duration_ms': duration_ms,
-                    'user': user,
-                })
+                recent_requests.append(
+                    {
+                        "timestamp": time.time(),
+                        "method": method,
+                        "path": path,
+                        "status": status,
+                        "duration_ms": duration_ms,
+                        "user": user,
+                    }
+                )
 
                 # Keep only last 100
                 recent_requests = recent_requests[-100:]
@@ -231,11 +256,13 @@ class HealthCheckMiddleware(MiddlewareMixin):
 
     def process_request(self, request: HttpRequest) -> Optional[HttpResponse]:
         """Return early for health check endpoints."""
-        if request.path in ['/health/', '/healthz/', '/ping/']:
-            return JsonResponse({
-                'status': 'healthy',
-                'timestamp': time.time(),
-            })
+        if request.path in ["/health/", "/healthz/", "/ping/"]:
+            return JsonResponse(
+                {
+                    "status": "healthy",
+                    "timestamp": time.time(),
+                }
+            )
         return None
 
 
@@ -249,12 +276,14 @@ class MetricsCollectionMiddleware(MiddlewareMixin):
     - Active users (last 5 minutes)
     """
 
-    def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
+    def process_response(
+        self, request: HttpRequest, response: HttpResponse
+    ) -> HttpResponse:
         """Collect metrics on response."""
         try:
             # Increment request counter
             path = self._normalize_path(request.path)
-            counter_key = f'metrics:request_count:{path}'
+            counter_key = f"metrics:request_count:{path}"
 
             # Use cache.incr with default if key doesn't exist
             try:
@@ -265,15 +294,15 @@ class MetricsCollectionMiddleware(MiddlewareMixin):
 
             # Track errors
             if response.status_code >= 400:
-                error_key = f'metrics:error_count:{path}'
+                error_key = f"metrics:error_count:{path}"
                 try:
                     cache.incr(error_key, delta=1)
                 except ValueError:
                     cache.set(error_key, 1, 3600)
 
             # Track active users (last 5 minutes)
-            if hasattr(request, 'user') and request.user.is_authenticated:
-                active_users_key = 'metrics:active_users'
+            if hasattr(request, "user") and request.user.is_authenticated:
+                active_users_key = "metrics:active_users"
                 active_users = cache.get(active_users_key, set())
                 active_users.add(request.user.id)
                 cache.set(active_users_key, active_users, 300)  # 5 minute TTL
@@ -292,14 +321,16 @@ class MetricsCollectionMiddleware(MiddlewareMixin):
         - /api/v1/customers/456/ -> /api/v1/customers/{id}/
         """
         import re
+
         # Replace numeric IDs with {id}
-        normalized = re.sub(r'/\d+/', '/{id}/', path)
+        normalized = re.sub(r"/\d+/", "/{id}/", path)
         return normalized
 
 
 # =============================================================================
 # Structured Logging Middleware
 # =============================================================================
+
 
 class StructuredLoggingMiddleware:
     """
@@ -353,16 +384,15 @@ class StructuredLoggingMiddleware:
             logger_local.debug(
                 "Request received",
                 extra={
-                    'method': request.method,
-                    'path': request.path,
-                }
+                    "method": request.method,
+                    "path": request.path,
+                },
             )
 
         except Exception as e:
             # Don't fail the request if context extraction fails
             logger_local.warning(
-                "Failed to extract request context",
-                extra={'error': str(e)}
+                "Failed to extract request context", extra={"error": str(e)}
             )
 
         # Process request
@@ -371,8 +401,7 @@ class StructuredLoggingMiddleware:
 
             # Log the response
             logger_local.debug(
-                "Request completed",
-                extra={'status_code': response.status_code}
+                "Request completed", extra={"status_code": response.status_code}
             )
 
             return response
@@ -381,8 +410,8 @@ class StructuredLoggingMiddleware:
             # Log unhandled exceptions
             logger_local.error(
                 "Unhandled exception during request",
-                extra={'error': str(e), 'error_type': type(e).__name__},
-                exc_info=True
+                extra={"error": str(e), "error_type": type(e).__name__},
+                exc_info=True,
             )
             raise
 
@@ -412,7 +441,7 @@ class SlowRequestLoggingMiddleware:
         self.get_response = get_response
 
         # Get threshold from settings (default 1000ms)
-        self.threshold_ms = getattr(settings, 'SLOW_REQUEST_THRESHOLD_MS', 1000)
+        self.threshold_ms = getattr(settings, "SLOW_REQUEST_THRESHOLD_MS", 1000)
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """Measure request duration and log if slow."""
@@ -434,11 +463,43 @@ class SlowRequestLoggingMiddleware:
             logger_local.warning(
                 "Slow request detected",
                 extra={
-                    'duration_ms': round(duration_ms, 2),
-                    'threshold_ms': self.threshold_ms,
-                    'method': request.method,
-                    'path': request.path,
-                }
+                    "duration_ms": round(duration_ms, 2),
+                    "threshold_ms": self.threshold_ms,
+                    "method": request.method,
+                    "path": request.path,
+                },
             )
 
+        return response
+
+
+class ApiVersionMiddleware(MiddlewareMixin):
+    """
+    Middleware to add API version header to all responses for client version
+    tracking and future backward compatibility.
+
+    This middleware adds an API-Version header to every HTTP response, allowing
+    clients to track which version of the API they're interacting with and enabling
+    future backward-compatible changes.
+
+    Configuration:
+        Add to MIDDLEWARE in settings.py:
+
+        MIDDLEWARE = [
+            # ... other middleware ...
+            'upstream.middleware.ApiVersionMiddleware',
+            # ... rest of middleware ...
+        ]
+
+    To update the version:
+        Change the VERSION constant below and update docs/API_VERSIONING.md
+    """
+
+    VERSION = "1.0.0"
+
+    def process_response(
+        self, request: HttpRequest, response: HttpResponse
+    ) -> HttpResponse:
+        """Add API-Version header to response."""
+        response["API-Version"] = self.VERSION
         return response
