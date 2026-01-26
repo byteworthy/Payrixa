@@ -393,6 +393,11 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = ReportRunSerializer
     permission_classes = [IsAuthenticated, IsCustomerMember]
 
+    def get_queryset(self):
+        # PERF-20: Annotate drift_event_count to avoid N+1 queries
+        queryset = super().get_queryset()
+        return queryset.annotate(drift_event_count=Count("drift_events"))
+
     def get_serializer_class(self):
         if self.action == "list":
             return ReportRunSummarySerializer

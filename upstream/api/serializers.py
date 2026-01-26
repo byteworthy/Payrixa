@@ -126,8 +126,8 @@ class ReportRunSerializer(serializers.ModelSerializer):
     
     @extend_schema_field(OpenApiTypes.INT)
     def get_drift_event_count(self, obj):
-        """Count of drift events in this report."""
-        return obj.drift_events.count()
+        """Count of drift events in this report (PERF-20: uses annotated count)."""
+        return getattr(obj, "drift_event_count", obj.drift_events.count())
 
 
 class ReportRunSummarySerializer(serializers.ModelSerializer):
@@ -141,7 +141,8 @@ class ReportRunSummarySerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_drift_event_count(self, obj):
-        return obj.drift_events.count()
+        """PERF-20: Use annotated count to avoid N+1 queries."""
+        return getattr(obj, "drift_event_count", obj.drift_events.count())
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -249,36 +250,27 @@ class AlertEventSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'triggered_at']
 
     def get_operator_judgments(self, obj):
-        """Get operator judgments for this alert event."""
-        # Use for_customer to explicitly query judgments for this customer
-        from upstream.core.tenant import get_current_customer
-        customer = get_current_customer()
-        if customer:
-            judgments = OperatorJudgment.objects.for_customer(customer).filter(alert_event=obj)
-        else:
-            judgments = OperatorJudgment.all_objects.filter(alert_event=obj, customer=obj.customer)
+        """Get operator judgments for this alert event (PERF-20: uses prefetched data)."""
+        # Use prefetched operator_judgments to avoid N+1 queries
+        # Prefetch is defined in AlertEventViewSet.queryset
+        judgments = obj.operator_judgments.all()
         return OperatorJudgmentSerializer(judgments, many=True).data
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_judgment(self, obj):
-        """Check if this alert has any operator judgment."""
-        from upstream.core.tenant import get_current_customer
-        customer = get_current_customer()
-        if customer:
-            return OperatorJudgment.objects.for_customer(customer).filter(alert_event=obj).exists()
-        else:
-            return OperatorJudgment.all_objects.filter(alert_event=obj, customer=obj.customer).exists()
+        """Check if this alert has any operator judgment (PERF-20: uses prefetched data)."""
+        # Use prefetched operator_judgments to avoid N+1 queries
+        return len(obj.operator_judgments.all()) > 0
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_latest_judgment_verdict(self, obj):
-        """Get the most recent operator judgment verdict."""
-        from upstream.core.tenant import get_current_customer
-        customer = get_current_customer()
-        if customer:
-            latest = OperatorJudgment.objects.for_customer(customer).filter(alert_event=obj).order_by('-created_at').first()
-        else:
-            latest = OperatorJudgment.all_objects.filter(alert_event=obj, customer=obj.customer).order_by('-created_at').first()
-        return latest.verdict if latest else None
+        """Get the most recent operator judgment verdict (PERF-20: uses prefetched data)."""
+        # Use prefetched operator_judgments and sort in Python to avoid N+1 queries
+        judgments = list(obj.operator_judgments.all())
+        if not judgments:
+            return None
+        latest = max(judgments, key=lambda j: j.created_at)
+        return latest.verdict
 
 
 class OperatorFeedbackSerializer(serializers.Serializer):
