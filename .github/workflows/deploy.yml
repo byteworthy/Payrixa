@@ -73,3 +73,37 @@ jobs:
         python scripts/smoke_test.py --url "${{ vars.DEPLOYMENT_URL }}" --max-retries 3 --retry-delay 10
       env:
         DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+
+    - name: Run rollback validation test
+      if: vars.DEPLOYMENT_URL != ''
+      run: |
+        pip install requests
+        python scripts/test_rollback.py \
+          --url "${{ vars.DEPLOYMENT_URL }}" \
+          --timeout 60 \
+          --retries 5 \
+          --retry-delay 15
+      env:
+        DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}
+
+  validate-rollback-script:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        pip install requests
+
+    - name: Validate rollback script syntax
+      run: |
+        python -m py_compile scripts/test_rollback.py
+        python scripts/test_rollback.py --help
