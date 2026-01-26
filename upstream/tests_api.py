@@ -312,12 +312,14 @@ class DriftEventEndpointTests(APITestBase):
         # Create report run and drift event for Customer A
         report_run = self.create_report_run_for_customer(self.customer_a)
         self.create_drift_event_for_customer(self.customer_a, report_run)
-        
+
         self.authenticate_as(self.user_a)
         response = self.client.get(f'{API_BASE}/drift-events/active/')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        # Response is now paginated with count, results, next, previous
+        self.assertIn('results', response.data)
+        self.assertEqual(len(response.data['results']), 1)
     
     def test_drift_events_filter_by_severity(self):
         """Drift events should be filterable by minimum severity."""
@@ -433,12 +435,14 @@ class PayerSummaryEndpointTests(APITestBase):
         
         self.authenticate_as(self.user_a)
         response = self.client.get(f'{API_BASE}/claims/payer_summary/')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
-        
+        # Response is now paginated with count, results, next, previous
+        self.assertIn('results', response.data)
+        self.assertEqual(len(response.data['results']), 2)
+
         # Find PayerOne in results
-        payer_one = next(p for p in response.data if p['payer'] == 'PayerOne')
+        payer_one = next(p for p in response.data['results'] if p['payer'] == 'PayerOne')
         self.assertEqual(payer_one['total_claims'], 5)
         self.assertEqual(payer_one['paid_count'], 3)
         self.assertEqual(payer_one['denied_count'], 2)
