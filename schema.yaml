@@ -1,0 +1,2504 @@
+openapi: 3.0.3
+info:
+  title: Upstream API
+  version: 1.0.0
+  description: Early-warning intelligence for healthcare revenue operations
+paths:
+  /api/v1/alerts/:
+    get:
+      operationId: alerts_list
+      description: Retrieve a paginated list of alert events with operator feedback.
+        Read-only to preserve audit trail.
+      summary: List alert events
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: 'Order by: triggered_at, status (prefix with - for descending)'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by payer name
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by alert status
+      tags:
+      - Alerts
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAlertEventList'
+          description: ''
+  /api/v1/alerts/{id}/:
+    get:
+      operationId: alerts_retrieve
+      description: Retrieve detailed information for a specific alert event including
+        operator judgments.
+      summary: Get alert event details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Alert Event.
+        required: true
+      tags:
+      - Alerts
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertEvent'
+          description: ''
+  /api/v1/alerts/{id}/feedback/:
+    post:
+      operationId: alerts_feedback_create
+      description: |-
+        Submit operator feedback/judgment on an alert event.
+        Creates or updates an OperatorJudgment record.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Alert Event.
+        required: true
+      tags:
+      - alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertEvent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertEvent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertEvent'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertEvent'
+          description: ''
+  /api/v1/auth/token/:
+    post:
+      operationId: auth_token_create
+      description: Obtain access and refresh JWT tokens using username and password.
+        Rate limited to 5 attempts per 15 minutes to prevent brute-force attacks.
+      summary: Obtain JWT token pair
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: Refresh an access token using a valid refresh token. Rate limited
+        to prevent abuse.
+      summary: Refresh JWT token
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/auth/token/verify/:
+    post:
+      operationId: auth_token_verify_create
+      description: Verify that a JWT token is valid and not expired. Rate limited
+        to prevent abuse.
+      summary: Verify JWT token
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerify'
+          description: ''
+  /api/v1/claims/:
+    get:
+      operationId: claims_list
+      description: Retrieve a paginated list of claim records with filtering, search,
+        and ordering. Returns summary data for performance. Rate limited to 2000 requests/hour.
+      summary: List claim records
+      parameters:
+      - in: query
+        name: cpt
+        schema:
+          type: string
+      - in: query
+        name: decided_date_after
+        schema:
+          type: string
+          format: date
+        description: Filter claims decided after this date (YYYY-MM-DD)
+      - in: query
+        name: decided_date_before
+        schema:
+          type: string
+          format: date
+        description: Filter claims decided before this date (YYYY-MM-DD)
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: 'Order by: decided_date, submitted_date, payer, outcome (prefix
+          with - for descending)'
+      - in: query
+        name: outcome
+        schema:
+          type: string
+        description: Filter by claim outcome (PAID, DENIED, OTHER)
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: payer
+        schema:
+          type: string
+        description: Filter by payer name
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by payer, CPT code, or denial reason code
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: submitted_date_after
+        schema:
+          type: string
+          format: date
+        description: Filter claims submitted after this date (YYYY-MM-DD)
+      - in: query
+        name: submitted_date_before
+        schema:
+          type: string
+          format: date
+        description: Filter claims submitted before this date (YYYY-MM-DD)
+      tags:
+      - Claims
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClaimRecordSummaryList'
+          description: ''
+  /api/v1/claims/{id}/:
+    get:
+      operationId: claims_retrieve
+      description: Retrieve detailed information for a specific claim record.
+      summary: Get claim record details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this claim record.
+        required: true
+      tags:
+      - Claims
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimRecord'
+          description: ''
+  /api/v1/claims/payer_summary/:
+    get:
+      operationId: claims_payer_summary_list
+      description: |-
+        Get aggregated statistics by payer.
+
+        Performance: Defaults to last 90 days to prevent expensive
+        full-table aggregation. Override with start_date/end_date params.
+      summary: Get payer summary statistics
+      parameters:
+      - in: query
+        name: cpt
+        schema:
+          type: string
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - in: query
+        name: outcome
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: payer
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      tags:
+      - claims
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPayerSummaryList'
+          description: ''
+  /api/v1/cpt-mappings/:
+    get:
+      operationId: cpt_mappings_list
+      description: Retrieve a list of CPT code to group mappings.
+      summary: List CPT group mappings
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Configuration
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCPTGroupMappingList'
+          description: ''
+    post:
+      operationId: cpt_mappings_create
+      description: Create a new CPT code to group mapping for categorizing procedure
+        codes.
+      summary: Create CPT group mapping
+      tags:
+      - Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CPTGroupMapping'
+            examples:
+              CreateCPTGroupMapping:
+                value:
+                  cpt_code: '99213'
+                  cpt_group: Office Visits
+                summary: Create CPT Group Mapping
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CPTGroupMapping'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CPTGroupMapping'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CPTGroupMapping'
+          description: ''
+  /api/v1/cpt-mappings/{id}/:
+    get:
+      operationId: cpt_mappings_retrieve
+      description: Retrieve details for a specific CPT group mapping.
+      summary: Get CPT group mapping details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this cpt group mapping.
+        required: true
+      tags:
+      - Configuration
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CPTGroupMapping'
+          description: ''
+    put:
+      operationId: cpt_mappings_update
+      description: Update a CPT group mapping.
+      summary: Update CPT group mapping
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this cpt group mapping.
+        required: true
+      tags:
+      - Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CPTGroupMapping'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CPTGroupMapping'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CPTGroupMapping'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CPTGroupMapping'
+          description: ''
+    patch:
+      operationId: cpt_mappings_partial_update
+      description: Update specific fields of a CPT group mapping.
+      summary: Partially update CPT group mapping
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this cpt group mapping.
+        required: true
+      tags:
+      - Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCPTGroupMapping'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCPTGroupMapping'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCPTGroupMapping'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CPTGroupMapping'
+          description: ''
+    delete:
+      operationId: cpt_mappings_destroy
+      description: Delete a CPT group mapping.
+      summary: Delete CPT group mapping
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this cpt group mapping.
+        required: true
+      tags:
+      - Configuration
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/customers/:
+    get:
+      operationId: customers_list
+      description: Retrieve a list of customers. Regular users only see their own
+        customer; superusers see all.
+      summary: List customers
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Customers
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCustomerList'
+          description: ''
+  /api/v1/customers/{id}/:
+    get:
+      operationId: customers_retrieve
+      description: Retrieve detailed information for a specific customer.
+      summary: Get customer details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this customer.
+        required: true
+      tags:
+      - Customers
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+          description: ''
+  /api/v1/dashboard/:
+    get:
+      operationId: dashboard_retrieve
+      description: Retrieve dashboard overview data including claim statistics, upload
+        counts, active drift events, denial rate trends, and top drift payers. Cached
+        for 5 minutes.
+      summary: Get dashboard overview
+      tags:
+      - Dashboard
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/v1/drift-events/:
+    get:
+      operationId: drift_events_list
+      description: Retrieve a paginated list of drift events with filtering, search,
+        and ordering. Rate limited to 2000 requests/hour.
+      summary: List drift events
+      parameters:
+      - in: query
+        name: cpt_group
+        schema:
+          type: string
+        description: Filter by CPT group
+      - in: query
+        name: created_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: created_before
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: drift_type
+        schema:
+          type: string
+        description: Filter by drift type
+      - in: query
+        name: max_severity
+        schema:
+          type: number
+          format: float
+      - in: query
+        name: min_severity
+        schema:
+          type: number
+          format: float
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: 'Order by: created_at, severity, payer (prefix with - for descending)'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: payer
+        schema:
+          type: string
+        description: Filter by payer name
+      - in: query
+        name: report_run
+        schema:
+          type: number
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by payer, CPT group, or drift type
+      - in: query
+        name: severity_max
+        schema:
+          type: number
+          format: float
+        description: Filter by maximum severity (0.0-1.0)
+      - in: query
+        name: severity_min
+        schema:
+          type: number
+          format: float
+        description: Filter by minimum severity (0.0-1.0)
+      tags:
+      - Drift Detection
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDriftEventList'
+          description: ''
+  /api/v1/drift-events/{id}/:
+    get:
+      operationId: drift_events_retrieve
+      description: Retrieve detailed information for a specific drift event including
+        baseline and current values.
+      summary: Get drift event details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this drift event.
+        required: true
+      tags:
+      - Drift Detection
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriftEvent'
+          description: ''
+  /api/v1/drift-events/active/:
+    get:
+      operationId: drift_events_active_list
+      description: Retrieve drift events from the most recent successful report run.
+        Returns paginated results.
+      summary: Get active drift events
+      parameters:
+      - in: query
+        name: created_after
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: created_before
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: drift_type
+        schema:
+          type: string
+      - in: query
+        name: max_severity
+        schema:
+          type: number
+          format: float
+      - in: query
+        name: min_severity
+        schema:
+          type: number
+          format: float
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number for pagination
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Number of results per page
+      - in: query
+        name: payer
+        schema:
+          type: string
+      - in: query
+        name: report_run
+        schema:
+          type: number
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Drift Detection
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDriftEventList'
+          description: ''
+  /api/v1/health/:
+    get:
+      operationId: health_retrieve
+      description: Check API health status. Returns application version and current
+        timestamp. No authentication required.
+      summary: API health check
+      tags:
+      - Health
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/v1/ingest/webhook/:
+    post:
+      operationId: ingest_webhook_create
+      description: 'Accept webhook payload authenticated with ingestion tokens. Creates
+        durable ingestion records for async processing. Include Authorization: Bearer
+        <token> header.'
+      summary: Ingest data via webhook
+      tags:
+      - Webhook Ingestion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+            examples:
+              WebhookPayload:
+                value:
+                  claims:
+                  - payer: BCBS
+                    cpt: '99213'
+                    submitted_date: '2024-01-15'
+                    decided_date: '2024-02-01'
+                    outcome: PAID
+                    allowed_amount: '150.00'
+                summary: Webhook Payload
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/v1/payer-mappings/:
+    get:
+      operationId: payer_mappings_list
+      description: Retrieve a list of payer name mappings for normalizing payer names.
+      summary: List payer mappings
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Configuration
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPayerMappingList'
+          description: ''
+    post:
+      operationId: payer_mappings_create
+      description: Create a new payer name mapping to normalize raw payer names to
+        standard names.
+      summary: Create payer mapping
+      tags:
+      - Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayerMapping'
+            examples:
+              CreatePayerMapping:
+                value:
+                  raw_name: BCBS CA
+                  normalized_name: Blue Cross Blue Shield California
+                summary: Create Payer Mapping
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PayerMapping'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PayerMapping'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayerMapping'
+          description: ''
+  /api/v1/payer-mappings/{id}/:
+    get:
+      operationId: payer_mappings_retrieve
+      description: Retrieve details for a specific payer mapping.
+      summary: Get payer mapping details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this payer mapping.
+        required: true
+      tags:
+      - Configuration
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayerMapping'
+          description: ''
+    put:
+      operationId: payer_mappings_update
+      description: Update a payer name mapping.
+      summary: Update payer mapping
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this payer mapping.
+        required: true
+      tags:
+      - Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayerMapping'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PayerMapping'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PayerMapping'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayerMapping'
+          description: ''
+    patch:
+      operationId: payer_mappings_partial_update
+      description: Update specific fields of a payer mapping.
+      summary: Partially update payer mapping
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this payer mapping.
+        required: true
+      tags:
+      - Configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPayerMapping'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPayerMapping'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPayerMapping'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayerMapping'
+          description: ''
+    delete:
+      operationId: payer_mappings_destroy
+      description: Delete a payer name mapping.
+      summary: Delete payer mapping
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this payer mapping.
+        required: true
+      tags:
+      - Configuration
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/reports/:
+    get:
+      operationId: reports_list
+      description: Retrieve a paginated list of report runs with their status and
+        drift event counts.
+      summary: List report runs
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Reports
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReportRunSummaryList'
+          description: ''
+  /api/v1/reports/{id}/:
+    get:
+      operationId: reports_retrieve
+      description: Retrieve detailed information for a specific report run including
+        all drift events.
+      summary: Get report run details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this report run.
+        required: true
+      tags:
+      - Reports
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportRun'
+          description: ''
+  /api/v1/reports/trigger/:
+    post:
+      operationId: reports_trigger_create
+      description: Trigger a new payer drift report run. Creates a report run and
+        queues async processing to detect payer behavior drift. Rate limited to 10
+        requests/hour.
+      summary: Trigger a new report run
+      tags:
+      - Reports
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportRun'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/v1/settings/:
+    get:
+      operationId: settings_list
+      description: Retrieve customer settings. Returns settings for the authenticated
+        user's customer.
+      summary: List settings
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Settings
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSettingsList'
+          description: ''
+    post:
+      operationId: settings_create
+      description: Create new customer settings with email notification preferences.
+      summary: Create settings
+      tags:
+      - Settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+            examples:
+              CreateSettings:
+                value:
+                  to_email: alerts@example.com
+                  cc_email: team@example.com
+                  attach_pdf: true
+                summary: Create Settings
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Settings'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+  /api/v1/settings/{id}/:
+    get:
+      operationId: settings_retrieve
+      description: Retrieve specific customer settings. Gets or creates settings for
+        the user's customer.
+      summary: Get settings
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this settings.
+        required: true
+      tags:
+      - Settings
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    put:
+      operationId: settings_update
+      description: Update all customer settings fields.
+      summary: Update settings
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this settings.
+        required: true
+      tags:
+      - Settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+            examples:
+              UpdateSettings:
+                value:
+                  to_email: alerts@example.com
+                  cc_email: team@example.com
+                  attach_pdf: false
+                summary: Update Settings
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Settings'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    patch:
+      operationId: settings_partial_update
+      description: Update specific customer settings fields.
+      summary: Partially update settings
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this settings.
+        required: true
+      tags:
+      - Settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+            examples:
+              PartialUpdate:
+                value:
+                  attach_pdf: false
+                summary: Partial Update
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    delete:
+      operationId: settings_destroy
+      description: Delete customer settings.
+      summary: Delete settings
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this settings.
+        required: true
+      tags:
+      - Settings
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/uploads/:
+    get:
+      operationId: uploads_list
+      description: Retrieve a paginated list of file uploads with filtering and search.
+        Returns summary data for performance.
+      summary: List uploads
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: 'Order by: uploaded_at, status, row_count (prefix with - for
+          descending)'
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by filename or status
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter by upload status (success, failed, processing)
+      tags:
+      - Uploads
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUploadSummaryList'
+          description: ''
+    post:
+      operationId: uploads_create
+      description: Create a new file upload record. Rate limited to 20 uploads/hour.
+      summary: Create upload
+      tags:
+      - Uploads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Upload'
+            examples:
+              CreateUpload:
+                value:
+                  filename: claims_2024_Q1.csv
+                  date_min: '2024-01-01'
+                  date_max: '2024-03-31'
+                summary: Create Upload
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Upload'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Upload'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upload'
+          description: ''
+  /api/v1/uploads/{id}/:
+    get:
+      operationId: uploads_retrieve
+      description: Retrieve detailed information for a specific upload including date
+        range and row count.
+      summary: Get upload details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this upload.
+        required: true
+      tags:
+      - Uploads
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upload'
+          description: ''
+    put:
+      operationId: uploads_update
+      description: Update upload metadata (filename, date range).
+      summary: Update upload
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this upload.
+        required: true
+      tags:
+      - Uploads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Upload'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Upload'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Upload'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upload'
+          description: ''
+    patch:
+      operationId: uploads_partial_update
+      description: Update specific upload fields.
+      summary: Partially update upload
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this upload.
+        required: true
+      tags:
+      - Uploads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpload'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpload'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpload'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upload'
+          description: ''
+    delete:
+      operationId: uploads_destroy
+      description: Delete an upload record.
+      summary: Delete upload
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this upload.
+        required: true
+      tags:
+      - Uploads
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/uploads/stats/:
+    get:
+      operationId: uploads_stats_retrieve
+      description: Retrieve aggregated upload statistics including total uploads,
+        success/failed counts, and total rows processed.
+      summary: Get upload statistics
+      tags:
+      - Uploads
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+components:
+  schemas:
+    AlertEvent:
+      type: object
+      description: Serializer for AlertEvent model with operator judgments.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+        alert_rule:
+          type: integer
+        drift_event:
+          type: integer
+          nullable: true
+        report_run:
+          type: integer
+          nullable: true
+        triggered_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/AlertEventStatusEnum'
+        payload: {}
+        notification_sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        operator_judgments:
+          type: string
+          readOnly: true
+        has_judgment:
+          type: boolean
+          description: 'Check if this alert has any operator judgment (PERF-20: uses
+            prefetched data).'
+          readOnly: true
+        latest_judgment_verdict:
+          type: string
+          description: 'Get the most recent operator judgment verdict (PERF-20: uses
+            prefetched data).'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - alert_rule
+      - created_at
+      - customer
+      - has_judgment
+      - id
+      - latest_judgment_verdict
+      - operator_judgments
+      - triggered_at
+      - updated_at
+    AlertEventStatusEnum:
+      enum:
+      - pending
+      - sent
+      - failed
+      - acknowledged
+      - resolved
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `sent` - Sent
+        * `failed` - Failed
+        * `acknowledged` - Acknowledged
+        * `resolved` - Resolved
+    CPTGroupMapping:
+      type: object
+      description: Serializer for CPTGroupMapping model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        cpt_code:
+          type: string
+          maxLength: 10
+        cpt_group:
+          type: string
+          maxLength: 50
+      required:
+      - cpt_code
+      - cpt_group
+      - customer
+      - id
+    ClaimRecord:
+      type: object
+      description: Serializer for ClaimRecord model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        upload:
+          type: integer
+          readOnly: true
+        payer:
+          type: string
+          description: Insurance payer name
+          maxLength: 255
+        cpt:
+          type: string
+          description: CPT procedure code
+          maxLength: 20
+        cpt_group:
+          type: string
+          description: CPT code group for analytics
+          maxLength: 50
+        submitted_date:
+          type: string
+          format: date
+        decided_date:
+          type: string
+          format: date
+        outcome:
+          $ref: '#/components/schemas/OutcomeEnum'
+        allowed_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+      required:
+      - cpt
+      - customer
+      - decided_date
+      - id
+      - outcome
+      - payer
+      - submitted_date
+      - upload
+    ClaimRecordSummary:
+      type: object
+      description: Lightweight serializer for ClaimRecord listings.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        payer:
+          type: string
+          description: Insurance payer name
+          maxLength: 255
+        cpt:
+          type: string
+          description: CPT procedure code
+          maxLength: 20
+        outcome:
+          $ref: '#/components/schemas/OutcomeEnum'
+        decided_date:
+          type: string
+          format: date
+      required:
+      - cpt
+      - decided_date
+      - id
+      - outcome
+      - payer
+    Customer:
+      type: object
+      description: Serializer for Customer model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+      required:
+      - id
+      - name
+    Dashboard:
+      type: object
+      description: Dashboard overview data.
+      properties:
+        total_claims:
+          type: integer
+        total_uploads:
+          type: integer
+        active_drift_events:
+          type: integer
+        last_report_date:
+          type: string
+          format: date-time
+          nullable: true
+        denial_rate_trend:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        top_drift_payers:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - active_drift_events
+      - denial_rate_trend
+      - last_report_date
+      - top_drift_payers
+      - total_claims
+      - total_uploads
+    DriftEvent:
+      type: object
+      description: Serializer for DriftEvent model with computed fields.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+        report_run:
+          type: integer
+        payer:
+          type: string
+        cpt_group:
+          type: string
+        drift_type:
+          $ref: '#/components/schemas/DriftTypeEnum'
+        baseline_value:
+          type: number
+          format: double
+        current_value:
+          type: number
+          format: double
+        delta_value:
+          type: number
+          format: double
+        delta_percent:
+          type: number
+          format: float
+          description: Calculate percentage change from baseline.
+          readOnly: true
+        severity:
+          type: number
+          format: double
+          maximum: 1.0
+          minimum: 0.0
+        severity_label:
+          type: string
+          description: Human-readable severity label.
+          readOnly: true
+        confidence:
+          type: number
+          format: double
+          maximum: 1.0
+          minimum: 0.0
+        baseline_start:
+          type: string
+          format: date
+        baseline_end:
+          type: string
+          format: date
+        current_start:
+          type: string
+          format: date
+        current_end:
+          type: string
+          format: date
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - baseline_end
+      - baseline_start
+      - baseline_value
+      - confidence
+      - cpt_group
+      - created_at
+      - current_end
+      - current_start
+      - current_value
+      - customer
+      - delta_percent
+      - delta_value
+      - drift_type
+      - id
+      - payer
+      - report_run
+      - severity
+      - severity_label
+    DriftTypeEnum:
+      enum:
+      - DENIAL_RATE
+      - DECISION_TIME
+      - PAYMENT_AMOUNT
+      - APPROVAL_RATE
+      - PROCESSING_DELAY
+      - AUTH_FAILURE_RATE
+      type: string
+      description: |-
+        * `DENIAL_RATE` - Denial Rate
+        * `DECISION_TIME` - Decision Time
+        * `PAYMENT_AMOUNT` - Payment Amount
+        * `APPROVAL_RATE` - Approval Rate
+        * `PROCESSING_DELAY` - Processing Delay
+        * `AUTH_FAILURE_RATE` - Authorization Failure Rate
+    OutcomeEnum:
+      enum:
+      - PAID
+      - DENIED
+      - OTHER
+      type: string
+      description: |-
+        * `PAID` - Paid
+        * `DENIED` - Denied
+        * `OTHER` - Other
+    PaginatedAlertEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertEvent'
+    PaginatedCPTGroupMappingList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CPTGroupMapping'
+    PaginatedClaimRecordSummaryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimRecordSummary'
+    PaginatedCustomerList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+    PaginatedDriftEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriftEvent'
+    PaginatedPayerMappingList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PayerMapping'
+    PaginatedPayerSummaryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PayerSummary'
+    PaginatedReportRunSummaryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportRunSummary'
+    PaginatedSettingsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Settings'
+    PaginatedUploadSummaryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UploadSummary'
+    PatchedCPTGroupMapping:
+      type: object
+      description: Serializer for CPTGroupMapping model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        cpt_code:
+          type: string
+          maxLength: 10
+        cpt_group:
+          type: string
+          maxLength: 50
+    PatchedPayerMapping:
+      type: object
+      description: Serializer for PayerMapping model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        raw_name:
+          type: string
+          maxLength: 255
+        normalized_name:
+          type: string
+          maxLength: 255
+    PatchedSettings:
+      type: object
+      description: Serializer for Settings model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        to_email:
+          type: string
+          format: email
+          maxLength: 254
+        cc_email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        attach_pdf:
+          type: boolean
+    PatchedUpload:
+      type: object
+      description: Serializer for Upload model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        filename:
+          type: string
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusB74Enum'
+          readOnly: true
+        error_message:
+          type: string
+          readOnly: true
+          nullable: true
+        row_count:
+          type: integer
+          readOnly: true
+          nullable: true
+        date_min:
+          type: string
+          format: date
+          nullable: true
+        date_max:
+          type: string
+          format: date
+          nullable: true
+    PayerMapping:
+      type: object
+      description: Serializer for PayerMapping model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        raw_name:
+          type: string
+          maxLength: 255
+        normalized_name:
+          type: string
+          maxLength: 255
+      required:
+      - customer
+      - id
+      - normalized_name
+      - raw_name
+    PayerSummary:
+      type: object
+      description: Aggregated payer statistics.
+      properties:
+        payer:
+          type: string
+        total_claims:
+          type: integer
+        paid_count:
+          type: integer
+        denied_count:
+          type: integer
+        other_count:
+          type: integer
+        denial_rate:
+          type: number
+          format: double
+        avg_allowed_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+      required:
+      - avg_allowed_amount
+      - denial_rate
+      - denied_count
+      - other_count
+      - paid_count
+      - payer
+      - total_claims
+    ReportRun:
+      type: object
+      description: Serializer for ReportRun model with nested drift events.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+        run_type:
+          $ref: '#/components/schemas/RunTypeEnum'
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        finished_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusDcfEnum'
+          readOnly: true
+        summary_json:
+          readOnly: true
+          nullable: true
+        drift_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriftEvent'
+          readOnly: true
+        drift_event_count:
+          type: integer
+          description: 'Count of drift events in this report (PERF-20: uses annotated
+            count).'
+          readOnly: true
+      required:
+      - customer
+      - drift_event_count
+      - drift_events
+      - finished_at
+      - id
+      - started_at
+      - status
+      - summary_json
+    ReportRunSummary:
+      type: object
+      description: Lightweight serializer for ReportRun listings.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        run_type:
+          $ref: '#/components/schemas/RunTypeEnum'
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusDcfEnum'
+        drift_event_count:
+          type: integer
+          description: 'PERF-20: Use annotated count to avoid N+1 queries.'
+          readOnly: true
+      required:
+      - drift_event_count
+      - id
+      - started_at
+    RunTypeEnum:
+      enum:
+      - weekly
+      - monthly
+      - custom
+      type: string
+      description: |-
+        * `weekly` - Weekly
+        * `monthly` - Monthly
+        * `custom` - Custom
+    Settings:
+      type: object
+      description: Serializer for Settings model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        to_email:
+          type: string
+          format: email
+          maxLength: 254
+        cc_email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        attach_pdf:
+          type: boolean
+      required:
+      - customer
+      - id
+      - to_email
+    StatusB74Enum:
+      enum:
+      - processing
+      - success
+      - failed
+      - partial
+      type: string
+      description: |-
+        * `processing` - Processing
+        * `success` - Success
+        * `failed` - Failed
+        * `partial` - Partial Success
+    StatusDcfEnum:
+      enum:
+      - running
+      - success
+      - failed
+      type: string
+      description: |-
+        * `running` - Running
+        * `success` - Success
+        * `failed` - Failed
+    TokenObtainPair:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - password
+      - refresh
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenVerify:
+      type: object
+      properties:
+        token:
+          type: string
+          writeOnly: true
+      required:
+      - token
+    Upload:
+      type: object
+      description: Serializer for Upload model.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        customer:
+          type: integer
+          readOnly: true
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        filename:
+          type: string
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusB74Enum'
+          readOnly: true
+        error_message:
+          type: string
+          readOnly: true
+          nullable: true
+        row_count:
+          type: integer
+          readOnly: true
+          nullable: true
+        date_min:
+          type: string
+          format: date
+          nullable: true
+        date_max:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - customer
+      - error_message
+      - filename
+      - id
+      - row_count
+      - status
+      - uploaded_at
+    UploadSummary:
+      type: object
+      description: Lightweight serializer for Upload listings.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        filename:
+          type: string
+          maxLength: 255
+        uploaded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusB74Enum'
+        row_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+      required:
+      - filename
+      - id
+      - uploaded_at
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
