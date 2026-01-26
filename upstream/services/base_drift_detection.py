@@ -93,7 +93,7 @@ class BaseDriftDetectionService(ABC):
         self,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
-        **kwargs
+        **kwargs,
     ) -> ComputationResult:
         """
         Main computation entry point following template method pattern.
@@ -131,24 +131,26 @@ class BaseDriftDetectionService(ABC):
             with transaction.atomic():
                 # Compute aggregates
                 aggregates = self._compute_aggregates(
-                    start_date=baseline_window['start'],
-                    end_date=current_window['end'],
-                    **kwargs
+                    start_date=baseline_window["start"],
+                    end_date=current_window["end"],
+                    **kwargs,
                 )
-                aggregates_created = len(aggregates) if isinstance(aggregates, list) else aggregates
+                aggregates_created = (
+                    len(aggregates) if isinstance(aggregates, list) else aggregates
+                )
 
                 # Detect signals
                 signals = self._detect_signals(
                     baseline_window=baseline_window,
                     current_window=current_window,
-                    **kwargs
+                    **kwargs,
                 )
                 signals_created = len(signals) if isinstance(signals, list) else signals
 
                 # Publish audit event
                 self._publish_computation_event(
                     signals_created=signals_created,
-                    aggregates_created=aggregates_created
+                    aggregates_created=aggregates_created,
                 )
 
             # Step 5: Return structured results
@@ -157,13 +159,11 @@ class BaseDriftDetectionService(ABC):
                 aggregates_created=aggregates_created,
                 baseline_window=baseline_window,
                 current_window=current_window,
-                metadata=self._get_result_metadata(signals_created, aggregates_created)
+                metadata=self._get_result_metadata(signals_created, aggregates_created),
             )
 
     def _compute_time_windows(
-        self,
-        start_date: Optional[date],
-        end_date: Optional[date]
+        self, start_date: Optional[date], end_date: Optional[date]
     ) -> Tuple[TimeWindow, TimeWindow]:
         """
         Compute baseline and current time windows for comparison.
@@ -190,15 +190,13 @@ class BaseDriftDetectionService(ABC):
         # Current window: most recent period
         current_end = end_date
         current_start = max(
-            start_date,
-            current_end - timedelta(days=self.DEFAULT_CURRENT_DAYS)
+            start_date, current_end - timedelta(days=self.DEFAULT_CURRENT_DAYS)
         )
 
         # Baseline window: comparison period before current
         baseline_end = current_start
         baseline_start = max(
-            start_date,
-            baseline_end - timedelta(days=self.DEFAULT_BASELINE_DAYS)
+            start_date, baseline_end - timedelta(days=self.DEFAULT_BASELINE_DAYS)
         )
 
         baseline_window = TimeWindow(start=baseline_start, end=baseline_end)
@@ -207,10 +205,7 @@ class BaseDriftDetectionService(ABC):
         return baseline_window, current_window
 
     @staticmethod
-    def compute_percentage_change(
-        baseline_value: float,
-        current_value: float
-    ) -> float:
+    def compute_percentage_change(baseline_value: float, current_value: float) -> float:
         """
         Compute percentage change from baseline to current.
 
@@ -227,11 +222,7 @@ class BaseDriftDetectionService(ABC):
         return (current_value - baseline_value) / baseline_value
 
     @staticmethod
-    def compute_z_score(
-        value: float,
-        mean: float,
-        std_dev: float
-    ) -> float:
+    def compute_z_score(value: float, mean: float, std_dev: float) -> float:
         """
         Compute z-score for statistical significance testing.
 
@@ -250,8 +241,7 @@ class BaseDriftDetectionService(ABC):
 
     @staticmethod
     def categorize_severity(
-        delta_magnitude: float,
-        thresholds: Dict[str, float]
+        delta_magnitude: float, thresholds: Dict[str, float]
     ) -> str:
         """
         Categorize severity based on delta magnitude and thresholds.
@@ -263,21 +253,21 @@ class BaseDriftDetectionService(ABC):
         Returns:
             Severity category string: 'critical', 'high', 'medium', or 'low'
         """
-        if delta_magnitude >= thresholds.get('critical', 0.30):
-            return 'critical'
-        elif delta_magnitude >= thresholds.get('high', 0.20):
-            return 'high'
-        elif delta_magnitude >= thresholds.get('medium', 0.10):
-            return 'medium'
+        if delta_magnitude >= thresholds.get("critical", 0.30):
+            return "critical"
+        elif delta_magnitude >= thresholds.get("high", 0.20):
+            return "high"
+        elif delta_magnitude >= thresholds.get("medium", 0.10):
+            return "medium"
         else:
-            return 'low'
+            return "low"
 
     @staticmethod
     def compute_confidence_score(
         sample_size: int,
         z_score: float,
         min_sample_size: int = 20,
-        significance_threshold: float = 0.05
+        significance_threshold: float = 0.05,
     ) -> Decimal:
         """
         Compute confidence score for statistical significance.
@@ -302,12 +292,10 @@ class BaseDriftDetectionService(ABC):
         significance_factor = min(abs(z_score) / z_threshold, 1.0) * 0.5
 
         confidence = Decimal(str(sample_factor + significance_factor))
-        return min(confidence, Decimal('1.0'))
+        return min(confidence, Decimal("1.0"))
 
     def _publish_computation_event(
-        self,
-        signals_created: int,
-        aggregates_created: int
+        self, signals_created: int, aggregates_created: int
     ) -> None:
         """
         Publish audit event for drift computation.
@@ -322,16 +310,14 @@ class BaseDriftDetectionService(ABC):
             entity_type=self.__class__.__name__,
             entity_id=str(self.customer.id),
             payload={
-                'signals_created': signals_created,
-                'aggregates_created': aggregates_created,
-                'product': self._get_product_name(),
-            }
+                "signals_created": signals_created,
+                "aggregates_created": aggregates_created,
+                "product": self._get_product_name(),
+            },
         )
 
     def _get_result_metadata(
-        self,
-        signals_created: int,
-        aggregates_created: int
+        self, signals_created: int, aggregates_created: int
     ) -> Dict[str, Any]:
         """
         Get product-specific metadata for computation result.
@@ -346,18 +332,15 @@ class BaseDriftDetectionService(ABC):
             Dict of metadata to include in result
         """
         return {
-            'product': self._get_product_name(),
-            'customer': self.customer.name,
+            "product": self._get_product_name(),
+            "customer": self.customer.name,
         }
 
     # Abstract methods that subclasses must implement
 
     @abstractmethod
     def _compute_aggregates(
-        self,
-        start_date: date,
-        end_date: date,
-        **kwargs
+        self, start_date: date, end_date: date, **kwargs
     ) -> List[Any]:
         """
         Compute product-specific aggregates for the date range.
@@ -377,10 +360,7 @@ class BaseDriftDetectionService(ABC):
 
     @abstractmethod
     def _detect_signals(
-        self,
-        baseline_window: TimeWindow,
-        current_window: TimeWindow,
-        **kwargs
+        self, baseline_window: TimeWindow, current_window: TimeWindow, **kwargs
     ) -> List[Any]:
         """
         Detect meaningful drift signals by comparing windows.

@@ -227,53 +227,21 @@ MEDIA_ROOT = BASE_DIR / "hello_world" / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =============================================================================
-# LOGGING (Audit Trail)
+# LOGGING (Audit Trail with Retention Policy)
 # =============================================================================
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
-            "style": "{",
-        },
-        "audit": {
-            "format": "{asctime} | {levelname} | {name} | {message}",
-            "style": "{",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "audit_file": {
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "audit.log",
-            "formatter": "audit",
-        },
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": "INFO",
-        },
-        "upstream": {
-            "handlers": ["console", "audit_file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "auditlog": {
-            "handlers": ["console", "audit_file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
+from upstream.logging_config import get_logging_config  # noqa: E402
 
-# Create logs directory if it doesn't exist
-(BASE_DIR / "logs").mkdir(exist_ok=True)
+# Use centralized logging configuration with:
+# - Automatic log rotation (daily at midnight)
+# - Retention policies (DEBUG: 7d, INFO: 30d, WARNING/ERROR: 90d, AUDIT: 7y)
+# - PHI/PII scrubbing on all handlers (HIPAA compliance)
+# - Structured logging for log aggregation
+LOGGING = get_logging_config(
+    base_dir=BASE_DIR,
+    environment="production",  # Overridden in dev.py and test.py
+    log_level="INFO",
+)
 
 # =============================================================================
 # CACHE SETTINGS

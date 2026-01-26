@@ -203,10 +203,10 @@ class DriftWatchSignalService:
 
                 # Track drift event metric
                 track_drift_event(
-                    product='DriftWatch',
-                    drift_type='DENIAL_RATE',
+                    product="DriftWatch",
+                    drift_type="DENIAL_RATE",
                     severity=float(severity),
-                    customer_id=self.customer.id
+                    customer_id=self.customer.id,
                 )
 
                 signals.append(signal)
@@ -297,10 +297,10 @@ class DriftWatchSignalService:
 
                 # Track drift event metric
                 track_drift_event(
-                    product='DriftWatch',
-                    drift_type='PAYMENT_AMOUNT',
+                    product="DriftWatch",
+                    drift_type="PAYMENT_AMOUNT",
                     severity=float(severity),
-                    customer_id=self.customer.id
+                    customer_id=self.customer.id,
                 )
 
                 signals.append(signal)
@@ -383,10 +383,10 @@ class DriftWatchSignalService:
 
                 # Track drift event metric
                 track_drift_event(
-                    product='DriftWatch',
-                    drift_type='PROCESSING_DELAY',
+                    product="DriftWatch",
+                    drift_type="PROCESSING_DELAY",
                     severity=float(severity),
-                    customer_id=self.customer.id
+                    customer_id=self.customer.id,
                 )
 
                 signals.append(signal)
@@ -464,10 +464,10 @@ class DriftWatchSignalService:
 
                 # Track drift event metric
                 track_drift_event(
-                    product='DriftWatch',
-                    drift_type='AUTH_FAILURE_RATE',
+                    product="DriftWatch",
+                    drift_type="AUTH_FAILURE_RATE",
                     severity=float(severity),
-                    customer_id=self.customer.id
+                    customer_id=self.customer.id,
                 )
 
                 signals.append(signal)
@@ -536,10 +536,10 @@ class DriftWatchSignalService:
 
                 # Track drift event metric
                 track_drift_event(
-                    product='DriftWatch',
-                    drift_type='APPROVAL_RATE',
+                    product="DriftWatch",
+                    drift_type="APPROVAL_RATE",
                     severity=float(severity),
-                    customer_id=self.customer.id
+                    customer_id=self.customer.id,
                 )
 
                 signals.append(signal)
@@ -610,10 +610,10 @@ class DriftWatchSignalService:
 
                 # Track drift event metric
                 track_drift_event(
-                    product='DriftWatch',
-                    drift_type='DECISION_TIME',
+                    product="DriftWatch",
+                    drift_type="DECISION_TIME",
                     severity=float(severity),
-                    customer_id=self.customer.id
+                    customer_id=self.customer.id,
                 )
 
                 signals.append(signal)

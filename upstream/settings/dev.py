@@ -52,6 +52,22 @@ EMAIL_BACKEND = config(
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="alerts@upstream.cx")
 
 # =============================================================================
+# LOGGING (Development)
+# =============================================================================
+
+from upstream.logging_config import get_logging_config
+
+# Override base logging with development settings
+# - Enables DEBUG level logging
+# - Uses SelectivePHIScrubberFilter (less aggressive)
+# - Includes debug.log file with verbose output
+LOGGING = get_logging_config(
+    base_dir=BASE_DIR,
+    environment="development",
+    log_level="DEBUG",
+)
+
+# =============================================================================
 # CODE QUALITY AUDITOR CONFIGURATION
 # =============================================================================
 

@@ -881,8 +881,7 @@ class DelayGuardComputationService:
 
         # Track payment delay signal metric
         payment_delay_signal_created.labels(
-            severity=severity,
-            customer_id=str(self.customer.id)
+            severity=severity, customer_id=str(self.customer.id)
         ).inc()
 
         if aggregates:

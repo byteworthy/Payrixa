@@ -188,6 +188,22 @@ else:
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="alerts@upstream.cx")
 
 # =============================================================================
+# LOGGING (Production)
+# =============================================================================
+
+from upstream.logging_config import get_logging_config
+
+# Override base logging with production settings
+# - Uses AggressivePHIScrubberFilter (maximum security)
+# - Structured logging for aggregation tools (CloudWatch, Datadog, etc.)
+# - Daily rotation with HIPAA-compliant retention
+LOGGING = get_logging_config(
+    base_dir=BASE_DIR,
+    environment="production",
+    log_level="INFO",
+)
+
+# =============================================================================
 # ERROR TRACKING (Sentry)
 # =============================================================================
 
