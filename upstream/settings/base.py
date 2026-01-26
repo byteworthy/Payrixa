@@ -143,17 +143,19 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         # Default rates
-        "anon": "100/hour",
-        "user": "1000/hour",
+        "anon": "100/h",
+        "user": "1000/h",
         # QW-5: Granular rate limiting for different operation types
-        "burst": "60/minute",  # High-frequency bursts (1 req/sec)
-        "sustained": "10000/day",  # Daily limit for sustained usage
-        "report_generation": "10/hour",  # Expensive: report generation
-        "bulk_operation": "20/hour",  # Expensive: file uploads, batch ops
-        "read_only": "2000/hour",  # Liberal: read operations
-        "write_operation": "500/hour",  # Moderate: write operations
-        "anon_strict": "30/hour",  # Very strict for anonymous users
-        "authentication": "5/15min",  # HIGH-2: Prevent brute-force attacks
+        "burst": "60/m",  # High-frequency bursts (1 req/sec)
+        "sustained": "10000/d",  # Daily limit for sustained usage
+        "report_generation": "10/h",  # Expensive: report generation
+        "bulk_operation": "20/h",  # Expensive: file uploads, batch ops
+        "read_only": "2000/h",  # Liberal: read operations
+        "write_operation": "500/h",  # Moderate: write operations
+        "anon_strict": "30/h",  # Very strict for anonymous users
+        # Note: DRF throttle parser doesn't support custom time periods like "15m"
+        # Using "5/h" as closest approximation (5 per hour instead of 5 per 15 minutes)
+        "authentication": "5/h",  # HIGH-2: Prevent brute-force attacks
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",

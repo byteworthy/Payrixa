@@ -656,17 +656,17 @@ class ReportRunEndpointTests(APITestBase):
 
 class ClaimRecordEndpointTests(APITestBase):
     """Tests for claim record endpoints."""
-    
+
     def test_claims_list_authenticated(self):
         """Claims list should return 200 for authenticated request."""
         self.authenticate_as(self.user_a)
         response = self.client.get(f'{API_BASE}/claims/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-    
+
     def test_claims_filter_by_payer(self):
         """Claims should be filterable by payer."""
         upload = self.create_upload_for_customer(self.customer_a)
-        
+
         ClaimRecord.objects.create(
             customer=self.customer_a,
             upload=upload,
@@ -685,18 +685,18 @@ class ClaimRecordEndpointTests(APITestBase):
             decided_date=timezone.now().date(),
             outcome='PAID'
         )
-        
+
         self.authenticate_as(self.user_a)
         response = self.client.get(f'{API_BASE}/claims/?payer=FilterPayer')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['payer'], 'FilterPayer')
-    
+
     def test_claims_filter_by_outcome(self):
         """Claims should be filterable by outcome."""
         upload = self.create_upload_for_customer(self.customer_a)
-        
+
         ClaimRecord.objects.create(
             customer=self.customer_a,
             upload=upload,
@@ -715,10 +715,201 @@ class ClaimRecordEndpointTests(APITestBase):
             decided_date=timezone.now().date(),
             outcome='DENIED'
         )
-        
+
         self.authenticate_as(self.user_a)
         response = self.client.get(f'{API_BASE}/claims/?outcome=denied')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['outcome'], 'DENIED')
+
+
+class ClaimRecordFilterTests(APITestBase):
+    """Tests for ClaimRecord filtering via DjangoFilterBackend."""
+
+    def setUp(self):
+        super().setUp()
+        # Create test claims with different attributes
+        self.upload = self.create_upload_for_customer(self.customer_a)
+        self.claim1 = ClaimRecord.objects.create(
+            customer=self.customer_a,
+            upload=self.upload,
+            payer='Aetna',
+            cpt='99213',
+            outcome='PAID',
+            decided_date='2024-06-15',
+            submitted_date='2024-06-01',
+            allowed_amount=100.00,
+        )
+        self.claim2 = ClaimRecord.objects.create(
+            customer=self.customer_a,
+            upload=self.upload,
+            payer='Blue Cross',
+            cpt='99214',
+            outcome='DENIED',
+            decided_date='2024-07-20',
+            submitted_date='2024-07-01',
+            allowed_amount=200.00,
+        )
+
+    def test_filter_by_payer_icontains(self):
+        """Test filtering claims by payer name (partial match)."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/claims/?payer=aet')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['payer'], 'Aetna')
+
+    def test_filter_by_outcome(self):
+        """Test filtering claims by outcome."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/claims/?outcome=denied')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['outcome'], 'DENIED')
+
+    def test_filter_by_date_range(self):
+        """Test filtering claims by date range."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(
+            f'{API_BASE}/claims/?start_date=2024-07-01&end_date=2024-07-31'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['payer'], 'Blue Cross')
+
+    def test_search_by_cpt(self):
+        """Test searching claims by CPT code."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/claims/?search=99213')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['cpt'], '99213')
+
+    def test_search_by_payer(self):
+        """Test searching claims by payer name."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/claims/?search=blue')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['payer'], 'Blue Cross')
+
+    def test_combined_filters(self):
+        """Test combining multiple filters."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(
+            f'{API_BASE}/claims/?payer=aet&outcome=paid'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+
+
+class DriftEventFilterTests(APITestBase):
+    """Tests for DriftEvent filtering via DjangoFilterBackend."""
+
+    def setUp(self):
+        super().setUp()
+        # Create a report run first
+        self.report = ReportRun.objects.create(
+            customer=self.customer_a,
+            run_type='weekly',
+            status='success',
+        )
+        self.drift1 = DriftEvent.objects.create(
+            customer=self.customer_a,
+            report_run=self.report,
+            payer='Aetna',
+            drift_type='DENIAL_RATE',
+            severity=0.8,
+            delta_value=0.15,
+            baseline_value=0.1,
+            current_value=0.25,
+            confidence=0.9,
+            baseline_start=timezone.now().date() - timedelta(days=104),
+            baseline_end=timezone.now().date() - timedelta(days=14),
+            current_start=timezone.now().date() - timedelta(days=14),
+            current_end=timezone.now().date(),
+        )
+        self.drift2 = DriftEvent.objects.create(
+            customer=self.customer_a,
+            report_run=self.report,
+            payer='Blue Cross',
+            drift_type='PAYMENT_TIMING',
+            severity=0.3,
+            delta_value=5.0,
+            baseline_value=10.0,
+            current_value=15.0,
+            confidence=0.85,
+            baseline_start=timezone.now().date() - timedelta(days=104),
+            baseline_end=timezone.now().date() - timedelta(days=14),
+            current_start=timezone.now().date() - timedelta(days=14),
+            current_end=timezone.now().date(),
+        )
+
+    def test_filter_by_min_severity(self):
+        """Test filtering drift events by minimum severity."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/drift-events/?min_severity=0.5')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['severity'], 0.8)
+
+    def test_filter_by_drift_type(self):
+        """Test filtering drift events by type."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/drift-events/?drift_type=denial_rate')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['drift_type'], 'DENIAL_RATE')
+
+    def test_filter_by_payer(self):
+        """Test filtering drift events by payer."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/drift-events/?payer=blue')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['payer'], 'Blue Cross')
+
+    def test_search_drift_events(self):
+        """Test searching drift events."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/drift-events/?search=aetna')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+
+
+class PaginationTests(APITestBase):
+    """Tests for API pagination."""
+
+    def test_payer_summary_paginated(self):
+        """Test that payer_summary returns paginated response."""
+        upload = self.create_upload_for_customer(self.customer_a)
+        # Create claims for multiple payers
+        for i in range(5):
+            ClaimRecord.objects.create(
+                customer=self.customer_a,
+                upload=upload,
+                payer=f'Payer{i}',
+                cpt='99213',
+                outcome='PAID',
+                decided_date='2024-06-15',
+                submitted_date='2024-06-01',
+                allowed_amount=100.00,
+            )
+
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/claims/payer_summary/')
+        self.assertEqual(response.status_code, 200)
+        # Check paginated response structure
+        self.assertIn('count', response.data)
+        self.assertIn('results', response.data)
+        self.assertIn('next', response.data)
+        self.assertIn('previous', response.data)
+
+    def test_list_pagination(self):
+        """Test that list endpoints are paginated."""
+        self.authenticate_as(self.user_a)
+        response = self.client.get(f'{API_BASE}/claims/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('count', response.data)
+        self.assertIn('results', response.data)

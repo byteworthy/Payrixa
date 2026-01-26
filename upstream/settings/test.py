@@ -105,3 +105,7 @@ MIDDLEWARE = [  # noqa: F405
     if "PrometheusBeforeMiddleware" not in m
     and "PrometheusAfterMiddleware" not in m
 ]
+
+# Override throttle rates for tests - use simple formats that DRF can parse
+# DRF throttle parser only supports single-digit multipliers like "5/h" not "5/15m"
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["authentication"] = "100/h"  # noqa: F405

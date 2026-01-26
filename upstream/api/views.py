@@ -211,7 +211,7 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     throttle_classes = [ReadOnlyThrottle]  # QW-5: Liberal rate limit for reads
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = ClaimRecordFilter
-    search_fields = ['claim_number', 'payer', 'cpt_code']
+    search_fields = ['payer', 'cpt', 'denial_reason_code']
     ordering_fields = ["decided_date", "submitted_date", "payer", "outcome"]
 
     def get_serializer_class(self):
@@ -416,7 +416,7 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
     throttle_classes = [ReadOnlyThrottle]  # QW-5: Liberal rate limit for reads
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = DriftEventFilter
-    search_fields = ['payer', 'cpt_code']
+    search_fields = ['payer', 'cpt_group', 'drift_type']
     ordering_fields = ['created_at', 'severity', 'payer']
 
     @extend_schema(
