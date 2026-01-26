@@ -3,6 +3,53 @@ Upstream API Views
 
 RESTful API endpoints for the Upstream platform.
 All views enforce multi-tenant access control.
+
+## Authentication
+
+All API endpoints (except /health and /auth/*) require JWT authentication.
+Include the access token in the Authorization header:
+
+    Authorization: Bearer <access_token>
+
+### Authentication Flow
+
+1. **Login**: POST to /api/v1/auth/token/ with username/password
+   - Returns access token (1 hour expiry) and refresh token (24 hour expiry)
+   - Access token is used for all subsequent API requests
+
+2. **API Requests**: Include access token in Authorization header
+   - Example: Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGci...
+
+3. **Token Refresh**: POST to /api/v1/auth/token/refresh/ with refresh token
+   - Returns new access token when current one expires
+   - Avoids requiring user to re-enter credentials
+
+4. **Token Verify**: POST to /api/v1/auth/token/verify/ with token
+   - Checks if token is valid and not expired
+   - Returns 200 if valid, 401 if invalid
+
+### RBAC Roles and Permissions
+
+The system supports three user roles with different permission levels:
+
+- **Superuser (Django superuser)**: Full access to all resources across all customers
+  - Can view and manage data for any customer
+  - Bypass tenant isolation filters
+  - Access Django admin interface
+
+- **Customer Admin (customer_admin role)**: Full access to their customer's data
+  - View, create, update, and delete all resources for their customer
+  - Manage uploads, reports, alerts, and configurations
+  - Cannot access other customers' data (tenant-isolated)
+
+- **Customer Viewer (customer_viewer role)**: Read-only access to their customer's data
+  - View uploads, claims, reports, and alerts for their customer
+  - Cannot create, update, or delete resources
+  - Cannot access other customers' data (tenant-isolated)
+
+All non-superuser API requests are automatically filtered to the user's customer
+via the CustomerFilterMixin. Attempting to access another customer's resources
+will return 404 Not Found.
 """
 
 from rest_framework import viewsets, status, filters
@@ -330,7 +377,11 @@ class SettingsViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
     ),
     create=extend_schema(
         summary="Create upload",
-        description="Create a new file upload record. Rate limited to 20 uploads/hour.",
+        description=(
+            "Create a new file upload record. Requires authentication - include "
+            "JWT access token in Authorization header. Rate limited to 20 uploads/hour. "
+            "User must have customer_admin role."
+        ),
         tags=["Uploads"],
         examples=[
             OpenApiExample(
@@ -341,6 +392,37 @@ class SettingsViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
                     "date_max": "2024-03-31",
                 },
                 request_only=True,
+            ),
+            OpenApiExample(
+                "Create Success",
+                value={
+                    "id": 42,
+                    "filename": "claims_2024_Q1.csv",
+                    "status": "processing",
+                    "uploaded_at": "2024-01-15T10:30:00Z",
+                    "date_min": "2024-01-01",
+                    "date_max": "2024-03-31",
+                    "row_count": 0,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+            OpenApiExample(
+                "Unauthorized - Missing Token",
+                value={"detail": "Authentication credentials were not provided."},
+                response_only=True,
+                status_codes=["401"],
+            ),
+            OpenApiExample(
+                "Forbidden - Insufficient Permissions",
+                value={
+                    "detail": (
+                        "You do not have permission to perform this action. "
+                        "Requires customer_admin role."
+                    )
+                },
+                response_only=True,
+                status_codes=["403"],
             ),
         ],
     ),
@@ -1880,9 +1962,94 @@ class HealthCheckView(APIView):
     description=(
         "Obtain access and refresh JWT tokens using username and password. "
         "Rate limited to 5 attempts per 15 minutes to prevent brute-force "
-        "attacks."
+        "attacks. Use the access token in the Authorization header for "
+        "subsequent API requests: 'Authorization: Bearer <access_token>'. "
+        "Access tokens expire after 1 hour. Use the refresh token to obtain "
+        "a new access token without re-authenticating.\n\n"
+        "**RBAC Roles:**\n"
+        "- **Owner**: Full access - manage users, alerts, webhooks, "
+        "upload claims, manage mappings, view reports\n"
+        "- **Admin**: Manage users, alerts, webhooks, upload claims, "
+        "manage mappings, view reports\n"
+        "- **Analyst**: Upload claims, manage mappings, view reports\n"
+        "- **Viewer**: View reports only\n\n"
+        "**Using the Token:**\n"
+        "Include the access token in the Authorization header:\n"
+        "```\nAuthorization: Bearer eyJ0eXAiOiJKV1QiLCJ...\n```\n\n"
+        "**Logout:**\n"
+        "JWTs are stateless. To logout, delete the tokens from the client. "
+        "Tokens automatically expire (access: 1 hour, refresh: 24 hours)."
     ),
     tags=["Authentication"],
+    examples=[
+        OpenApiExample(
+            "Login Request",
+            value={
+                "username": "doctor@healthcorp.com",
+                "password": "SecurePassword123!",
+            },
+            request_only=True,
+        ),
+        OpenApiExample(
+            "Login Success",
+            value={
+                "access": (
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImRvY3Rvckho"
+                    "ZWFsdGhjb3JwLmNvbSJ9.abc123"
+                ),
+                "refresh": (
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJ1c2VyX2lkIjoxLCJ0eXBlIjoicmVmcmVzaCJ9."
+                    "def456"
+                ),
+            },
+            response_only=True,
+            status_codes=["200"],
+        ),
+        OpenApiExample(
+            "Login Failed - Invalid Credentials",
+            value={
+                "detail": "No active account found with the given credentials"
+            },
+            response_only=True,
+            status_codes=["401"],
+        ),
+        OpenApiExample(
+            "Login Failed - Rate Limited",
+            value={
+                "detail": (
+                    "Request was throttled. Expected available in "
+                    "600 seconds."
+                )
+            },
+            response_only=True,
+            status_codes=["429"],
+        ),
+        OpenApiExample(
+            "Using Token - Example API Request",
+            description=(
+                "After login, include the access token in the "
+                "Authorization header for all API requests. "
+                "Example: GET /api/uploads/ with Authorization header."
+            ),
+            value={
+                "count": 42,
+                "next": "https://api.example.com/api/uploads/?page=2",
+                "previous": None,
+                "results": [
+                    {
+                        "id": 123,
+                        "filename": "claims_2024_01.csv",
+                        "status": "success",
+                        "uploaded_at": "2024-01-15T10:30:00Z",
+                    }
+                ],
+            },
+            response_only=True,
+            status_codes=["200"],
+        ),
+    ],
 )
 class ThrottledTokenObtainPairView(BaseTokenObtainPairView):
     """
@@ -1897,9 +2064,43 @@ class ThrottledTokenObtainPairView(BaseTokenObtainPairView):
     summary="Refresh JWT token",
     description=(
         "Refresh an access token using a valid refresh token. "
+        "Access tokens expire after 1 hour. Use this endpoint to obtain "
+        "a new access token without requiring the user to re-authenticate "
+        "with username/password. Refresh tokens are valid for 24 hours. "
         "Rate limited to prevent abuse."
     ),
     tags=["Authentication"],
+    examples=[
+        OpenApiExample(
+            "Refresh Request",
+            value={
+                "refresh": (
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJ1c2VyX2lkIjoxLCJ0eXBlIjoicmVmcmVzaCJ9."
+                    "def456"
+                ),
+            },
+            request_only=True,
+        ),
+        OpenApiExample(
+            "Refresh Success",
+            value={
+                "access": (
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImRvY3Rvckho"
+                    "ZWFsdGhjb3JwLmNvbSJ9.xyz789"
+                ),
+            },
+            response_only=True,
+            status_codes=["200"],
+        ),
+        OpenApiExample(
+            "Refresh Failed - Invalid Token",
+            value={"detail": "Token is invalid or expired", "code": "token_not_valid"},
+            response_only=True,
+            status_codes=["401"],
+        ),
+    ],
 )
 class ThrottledTokenRefreshView(BaseTokenRefreshView):
     """
@@ -1912,10 +2113,37 @@ class ThrottledTokenRefreshView(BaseTokenRefreshView):
 @extend_schema(
     summary="Verify JWT token",
     description=(
-        "Verify that a JWT token is valid and not expired. "
+        "Verify that a JWT token (access or refresh) is valid and not expired. "
+        "Returns an empty 200 response if valid, or 401 error if invalid/expired. "
+        "Useful for checking token validity before making API requests. "
         "Rate limited to prevent abuse."
     ),
     tags=["Authentication"],
+    examples=[
+        OpenApiExample(
+            "Verify Request",
+            value={
+                "token": (
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImRvY3Rvckho"
+                    "ZWFsdGhjb3JwLmNvbSJ9.abc123"
+                ),
+            },
+            request_only=True,
+        ),
+        OpenApiExample(
+            "Token Valid",
+            value={},
+            response_only=True,
+            status_codes=["200"],
+        ),
+        OpenApiExample(
+            "Token Invalid",
+            value={"detail": "Token is invalid or expired", "code": "token_not_valid"},
+            response_only=True,
+            status_codes=["401"],
+        ),
+    ],
 )
 class ThrottledTokenVerifyView(BaseTokenVerifyView):
     """
