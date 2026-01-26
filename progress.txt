@@ -199,3 +199,83 @@ Story: #3 - Document authentication flow with examples
 - Authorization header usage documented with examples
 - OpenAPI schema validates with 0 errors
 - 64/67 API tests pass (3 pre-existing failures unrelated to changes)
+
+## Iteration 4 - 2026-01-26T23:35:00Z
+Story: #4 - Create comprehensive API usage guide with curl examples
+
+### Implementation
+- Created docs/API_EXAMPLES.md (1294 lines) with 7 major sections
+- Section 1 - Authentication (4 examples):
+  * Login with JWT token obtain
+  * Refresh access token
+  * Verify token validity
+  * Using authentication in subsequent requests
+- Section 2 - Uploads (5 examples):
+  * List uploads with pagination
+  * Filter by status
+  * Get upload details
+  * Create new upload (with rate limit and permission docs)
+  * Get upload statistics
+- Section 3 - Claims (5 examples):
+  * List claims with pagination
+  * Filter by payer
+  * Filter by outcome
+  * Filter by date range
+  * Get payer summary statistics
+- Section 4 - Drift Events (5 examples):
+  * List drift events
+  * Filter by severity threshold
+  * Filter by payer and drift type
+  * Get active drift events
+  * Get drift event details
+- Section 5 - Reports (5 examples):
+  * List report runs
+  * Get report run details
+  * Trigger new report run
+  * Poll report status
+  * Get dashboard overview
+- Section 6 - Alerts (5 examples):
+  * List alert events
+  * Get alert event details
+  * Submit operator feedback (real alert with recovery)
+  * Submit operator feedback (noise/false positive)
+  * Filter alerts by status
+- Section 7 - Webhooks (5 examples):
+  * Webhook ingestion with claims data
+  * Authentication error handling
+  * Idempotent requests with X-Idempotency-Key
+  * Empty payload error
+  * Health check endpoint
+- Additional reference sections:
+  * Common error responses (401, 403, 404, 429)
+  * Rate limits table
+  * RBAC roles and permissions matrix
+  * Support information
+
+### Key Decisions
+- Used realistic healthcare data throughout (BCBS, Aetna, UHC, actual CPT codes)
+- Included Authorization: Bearer headers in all protected endpoint examples
+- Showed both success and error responses for each operation
+- Documented rate limits and required permissions inline with examples
+- Used proper JWT token format (not actual tokens, but realistic structure)
+- Included idempotency pattern for webhook ingestion
+- Covered pagination in detail with next/previous links
+
+### Learnings
+- Comprehensive API examples are crucial for developer onboarding
+- Real-world data in examples (not foo/bar) makes documentation much more useful
+- Error cases are as important as success cases in API documentation
+- Rate limits and permissions should be documented per-endpoint
+- Curl examples need proper escaping and formatting for readability
+- Multiple examples per section show API flexibility and capabilities
+
+### Status
+✅ Story #4 completed and committed (commit: 6331d157)
+- Created API_EXAMPLES.md with 7+ major sections (7 sections delivered)
+- Each section has 3-5 practical examples (4-5 per section delivered)
+- File is 1294 lines (exceeds 500+ line requirement)
+- All examples use realistic healthcare data
+- All curl examples include authentication headers
+- Response examples show actual JSON structure
+- Examples cover success and error cases
+- Comprehensive reference sections included

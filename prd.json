@@ -90,7 +90,7 @@
       "files": [
         "docs/API_EXAMPLES.md"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }
