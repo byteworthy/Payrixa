@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import date, timedelta
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 from upstream.models import ClaimRecord, ReportRun, DriftEvent, Customer
 from upstream.constants import (
@@ -39,6 +39,12 @@ def compute_weekly_payer_drift(
 
     Returns:
         ReportRun object with results
+
+    Concurrency:
+        Uses select_for_update() to lock the customer row, preventing concurrent
+        drift computations for the same customer from creating duplicate events.
+        Other Celery tasks attempting to compute drift for the same customer will
+        block until this transaction completes.
     """
     if as_of_date is None:
         as_of_date = timezone.now().date()
@@ -60,17 +66,21 @@ def compute_weekly_payer_drift(
 
     try:
         with transaction.atomic():
+            # Lock customer row to prevent concurrent drift computation
+            # Other tasks for same customer will wait until this transaction commits
+            locked_customer = Customer.objects.select_for_update().get(id=customer.id)
+
             # CRIT-4: Use .values() to fetch only needed fields
             # Reduces memory usage by 90% for large datasets
             baseline_records = ClaimRecord.objects.filter(
-                customer=customer,
+                customer=locked_customer,
                 submitted_date__gte=baseline_start,
                 submitted_date__lt=baseline_end,
                 outcome__in=["PAID", "DENIED"],
             ).values("payer", "cpt_group", "outcome", "submitted_date", "decided_date")
 
             current_records = ClaimRecord.objects.filter(
-                customer=customer,
+                customer=locked_customer,
                 submitted_date__gte=current_start,
                 submitted_date__lt=current_end,
                 outcome__in=["PAID", "DENIED"],
@@ -159,23 +169,29 @@ def compute_weekly_payer_drift(
                         1.0,
                     )  # Cap at 1.0
 
-                    DriftEvent.objects.create(
-                        customer=customer,
-                        report_run=report_run,
-                        payer=payer,
-                        cpt_group=cpt_group,
-                        drift_type="DENIAL_RATE",
-                        baseline_value=baseline_denial_rate,
-                        current_value=current_denial_rate,
-                        delta_value=denial_delta,
-                        severity=severity,
-                        confidence=confidence,
-                        baseline_start=baseline_start,
-                        baseline_end=baseline_end,
-                        current_start=current_start,
-                        current_end=current_end,
-                    )
-                    events_created += 1
+                    try:
+                        DriftEvent.objects.create(
+                            customer=locked_customer,
+                            report_run=report_run,
+                            payer=payer,
+                            cpt_group=cpt_group,
+                            drift_type="DENIAL_RATE",
+                            baseline_value=baseline_denial_rate,
+                            current_value=current_denial_rate,
+                            delta_value=denial_delta,
+                            severity=severity,
+                            confidence=confidence,
+                            baseline_start=baseline_start,
+                            baseline_end=baseline_end,
+                            current_start=current_start,
+                            current_end=current_end,
+                        )
+                        events_created += 1
+                    except IntegrityError:
+                        # Duplicate event already exists (race condition)
+                        # Expected when unique constraint is added in migration 0014
+                        # Duplicate prevention working as intended
+                        pass
 
                 # Calculate decision times (median)
                 baseline_decision_time = None
@@ -211,23 +227,29 @@ def compute_weekly_payer_drift(
                             1.0,
                         )  # Cap at 1.0
 
-                        DriftEvent.objects.create(
-                            customer=customer,
-                            report_run=report_run,
-                            payer=payer,
-                            cpt_group=cpt_group,
-                            drift_type="DECISION_TIME",
-                            baseline_value=baseline_decision_time,
-                            current_value=current_decision_time,
-                            delta_value=decision_delta,
-                            severity=severity,
-                            confidence=confidence,
-                            baseline_start=baseline_start,
-                            baseline_end=baseline_end,
-                            current_start=current_start,
-                            current_end=current_end,
-                        )
-                        events_created += 1
+                        try:
+                            DriftEvent.objects.create(
+                                customer=locked_customer,
+                                report_run=report_run,
+                                payer=payer,
+                                cpt_group=cpt_group,
+                                drift_type="DECISION_TIME",
+                                baseline_value=baseline_decision_time,
+                                current_value=current_decision_time,
+                                delta_value=decision_delta,
+                                severity=severity,
+                                confidence=confidence,
+                                baseline_start=baseline_start,
+                                baseline_end=baseline_end,
+                                current_start=current_start,
+                                current_end=current_end,
+                            )
+                            events_created += 1
+                        except IntegrityError:
+                            # Duplicate event already exists (race condition)
+                            # Expected when unique constraint added in migration 0014
+                            # Duplicate prevention working as intended
+                            pass
 
             # Update report run with summary
             report_run.summary_json = {
