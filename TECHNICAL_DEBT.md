@@ -443,11 +443,21 @@ fi
 
 ---
 
-### HIGH-7: Missing Input Validation on Query Params
+### ~~HIGH-7: Missing Input Validation on Query Params~~ ✅ RESOLVED
 **Domain**: API
-**File**: upstream/api/views.py:183
+**File**: upstream/api/views.py:207-244
 **Impact**: 500 errors on malformed dates
 **Effort**: Medium
+**Status**: ✅ Fixed on 2026-01-26
+
+**Resolution**:
+- Added `ValidationError` import from rest_framework.exceptions
+- Added `datetime` import for date parsing
+- Validate start_date and end_date query parameters using `datetime.strptime()`
+- Return 400 Bad Request with clear error message on invalid dates
+- Validates format as YYYY-MM-DD (e.g., "2024-01-15")
+- **Expected Impact**: Better user experience, prevents internal server errors from malformed input
+- **Error Message**: "Invalid date format. Use YYYY-MM-DD (e.g., 2024-01-15)"
 
 ---
 
@@ -697,15 +707,15 @@ fi
 
 ## Progress Tracking
 
-**Current Status**: Phase 2 - IN PROGRESS (16/43 Critical+High Issues Resolved - 37.2%) 🚧
+**Current Status**: Phase 2 - IN PROGRESS (17/43 Critical+High Issues Resolved - 39.5%) 🚧
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 115 | 87.8% |
+| To Do | 114 | 87.0% |
 | In Progress | 0 | 0% |
-| Done | 16 | 12.2% |
+| Done | 17 | 13.0% |
 
 ### By Domain Completion
 
@@ -716,7 +726,7 @@ fi
 | Testing | 17 | 1 | 5.9% |
 | Architecture | 21 | 0 | 0% |
 | Database | 22 | 2 | 9.1% |
-| API | 23 | 1 | 4.3% |
+| API | 23 | 2 | 8.7% |
 | DevOps | 30 | 6 | 20.0% |
 
 ### Recently Completed (2026-01-26)
@@ -733,11 +743,12 @@ fi
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 - ✅ **CRIT-10**: No rollback strategy in deployments (cloudbuild.yaml, scripts/smoke_test.py)
 
-**Phase 2 - High Priority Issues (6/33 - 18.2%)** 🚧
+**Phase 2 - High Priority Issues (7/33 - 21.2%)** 🚧
 - ✅ **HIGH-1**: JWT token blacklist configuration (upstream/settings/base.py)
 - ✅ **HIGH-2**: Rate limiting on auth endpoints (upstream/api/throttling.py, views.py, urls.py)
 - ✅ **HIGH-3**: N+1 query in AlertEvent processing (upstream/products/delayguard/views.py)
 - ✅ **HIGH-6**: Security scanners block CI (.github/workflows/security.yml)
+- ✅ **HIGH-7**: Input validation on query params (upstream/api/views.py)
 - ✅ **HIGH-8**: AlertEventViewSet audit trail protection (upstream/api/views.py)
 - ✅ **HIGH-10**: Container vulnerability scanning (.github/workflows/docker.yml)
 
