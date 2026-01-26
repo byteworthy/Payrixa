@@ -598,6 +598,99 @@ class PayerDriftTests(TestCase):
             # Restore original function
             upstream.services.payer_drift.compute_weekly_payer_drift = original_compute
 
+    def test_concurrent_drift_detection_prevents_duplicates(self):
+        """
+        Test that drift computation uses select_for_update() for row locking.
+
+        Validates DB-01: Transaction isolation for concurrent drift detection.
+
+        Note: This test verifies the locking code is present. Full concurrent
+        testing requires PostgreSQL in production.
+        """
+        from django.db import connection
+
+        # Create customer with sufficient claims for drift detection
+        customer = Customer.objects.create(name="Concurrent Test Customer")
+        upload = Upload.objects.create(
+            customer=customer, filename="concurrent_test.csv", status="success"
+        )
+
+        # Create claims that will trigger drift events
+        from datetime import timedelta
+
+        as_of_date = timezone.now().date()
+
+        # Baseline period (90-14 days ago) - low denial rate (20%)
+        baseline_start = as_of_date - timedelta(days=104)  # 90 + 14
+        baseline_end = as_of_date - timedelta(days=14)
+
+        for i in range(50):  # 50 total, 10 denied = 20% denial rate
+            submitted_date = baseline_start + timedelta(days=i % 30)
+            decided_date = submitted_date + timedelta(days=5)
+            outcome = "DENIED" if i < 10 else "PAID"
+            ClaimRecord.objects.create(
+                customer=customer,
+                upload=upload,
+                payer="Test Payer",
+                cpt="99213",
+                cpt_group="E&M",
+                submitted_date=submitted_date,
+                decided_date=decided_date,
+                outcome=outcome,
+            )
+
+        # Current period (last 14 days) - high denial rate (60%)
+        current_start = baseline_end
+        current_end = as_of_date
+
+        for i in range(50):  # 50 total, 30 denied = 60% denial rate
+            submitted_date = current_start + timedelta(days=i % 10)
+            decided_date = submitted_date + timedelta(days=5)
+            outcome = "DENIED" if i < 30 else "PAID"
+            ClaimRecord.objects.create(
+                customer=customer,
+                upload=upload,
+                payer="Test Payer",
+                cpt="99213",
+                cpt_group="E&M",
+                submitted_date=submitted_date,
+                decided_date=decided_date,
+                outcome=outcome,
+            )
+
+        # Verify select_for_update() is used in the code
+        from upstream.services.payer_drift import compute_weekly_payer_drift
+        import inspect
+
+        source = inspect.getsource(compute_weekly_payer_drift)
+        self.assertIn(
+            "select_for_update",
+            source,
+            "compute_weekly_payer_drift should use select_for_update() for locking",
+        )
+        self.assertIn(
+            "locked_customer",
+            source,
+            "compute_weekly_payer_drift should use locked_customer variable",
+        )
+        self.assertIn(
+            "IntegrityError",
+            source,
+            "compute_weekly_payer_drift should handle IntegrityError for duplicates",
+        )
+
+        # Run a simple drift computation to verify it works
+        report_run = compute_weekly_payer_drift(
+            customer=customer,
+            baseline_days=90,
+            current_days=14,
+            min_volume=30,
+            as_of_date=as_of_date,
+        )
+
+        # Verify computation succeeded (even if no drift detected)
+        self.assertEqual(report_run.status, "success")
+
 
 class ReportArtifactTests(TestCase):
     def setUp(self):

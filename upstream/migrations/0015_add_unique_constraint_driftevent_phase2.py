@@ -10,7 +10,36 @@ metadata-only operation that doesn't rebuild the index.
 
 Part of DB-02: Implement unique constraints for data integrity.
 """
-from django.db import migrations, models
+from django.db import migrations, models, connection
+
+
+def add_constraint(apps, schema_editor):
+    """Add unique constraint with database-specific SQL."""
+    if connection.vendor == "postgresql":
+        # PostgreSQL: Use existing index to create constraint (fast)
+        schema_editor.execute(
+            """
+            ALTER TABLE upstream_driftevent
+            ADD CONSTRAINT driftevent_unique_signal
+            UNIQUE USING INDEX driftevent_signal_uniq_idx;
+        """
+        )
+    # SQLite: Unique index already enforces uniqueness, no constraint needed
+
+
+def drop_constraint(apps, schema_editor):
+    """Drop unique constraint with database-specific SQL."""
+    if connection.vendor == "postgresql":
+        schema_editor.execute(
+            """
+            ALTER TABLE upstream_driftevent
+            DROP CONSTRAINT IF EXISTS driftevent_unique_signal;
+
+            CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS driftevent_signal_uniq_idx
+            ON upstream_driftevent (customer_id, report_run_id, payer, cpt_group, drift_type);
+        """
+        )
+    # SQLite: Nothing to drop
 
 
 class Migration(migrations.Migration):
@@ -32,30 +61,19 @@ class Migration(migrations.Migration):
                 migrations.AddConstraint(
                     model_name="driftevent",
                     constraint=models.UniqueConstraint(
-                        fields=["customer", "report_run", "payer", "cpt_group", "drift_type"],
+                        fields=[
+                            "customer",
+                            "report_run",
+                            "payer",
+                            "cpt_group",
+                            "drift_type",
+                        ],
                         name="driftevent_unique_signal",
                     ),
                 ),
             ],
             database_operations=[
-                # Use existing index to create constraint (fast metadata operation)
-                # PostgreSQL's "UNIQUE USING INDEX" promotes an existing unique index
-                # to a constraint without rebuilding it
-                migrations.RunSQL(
-                    sql="""
-                        ALTER TABLE upstream_driftevent
-                        ADD CONSTRAINT driftevent_unique_signal
-                        UNIQUE USING INDEX driftevent_signal_uniq_idx;
-                    """,
-                    reverse_sql="""
-                        ALTER TABLE upstream_driftevent
-                        DROP CONSTRAINT IF EXISTS driftevent_unique_signal;
-                        -- Note: Index is automatically dropped when constraint is dropped
-                        -- if it was created from the index. We recreate it for rollback.
-                        CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS driftevent_signal_uniq_idx
-                        ON upstream_driftevent (customer_id, report_run_id, payer, cpt_group, drift_type);
-                    """,
-                ),
+                migrations.RunPython(add_constraint, drop_constraint),
             ],
         ),
     ]
