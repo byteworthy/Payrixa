@@ -163,22 +163,47 @@ for record in baseline_records:
 
 ---
 
-### CRIT-5: DenialScope Python Iteration Instead of DB Aggregation
+### ~~CRIT-5: DenialScope Python Iteration Instead of DB Aggregation~~ ✅ RESOLVED
 **Domain**: Performance
-**File**: upstream/products/denialscope/services.py:146-161
+**File**: upstream/products/denialscope/services.py:137-145, 274-304, 315-326
 **Impact**: 30K aggregate records processed in Python
 **Effort**: Small
+**Status**: ✅ Fixed on 2026-01-26
 
 **Description**: Groups aggregates in Python loop instead of database query.
 
-**Fix**:
+**Fix Applied**:
 ```python
-aggregates_qs.values('payer', 'denial_reason').annotate(
-    total_denied=Sum('denied_count'),
-    total_dollars=Sum('denied_dollars'),
-    total_submitted=Sum('total_submitted_count')
+# Replaced Python iteration with database aggregation
+def _group_aggregates_in_db(self, start_date, end_date):
+    """Group aggregates using database aggregation."""
+    grouped_data = DenialAggregate.objects.filter(
+        customer=self.customer,
+        aggregate_date__gte=start_date,
+        aggregate_date__lt=end_date
+    ).values('payer', 'denial_reason').annotate(
+        total_denied=Sum('denied_count'),
+        total_denied_dollars=Sum('denied_dollars'),
+        total_submitted=Sum('total_submitted_count'),
+        total_submitted_dollars=Sum('total_submitted_dollars')
+    )
+    # Convert to dict keyed by (payer, denial_reason)
+    # ...
+
+# Modified _create_signal to fetch related aggregates from DB
+related_aggs = DenialAggregate.objects.filter(
+    customer=self.customer, payer=payer, denial_reason=denial_reason,
+    aggregate_date__gte=window_start, aggregate_date__lt=window_end
 )
 ```
+
+**Resolution**:
+- Replaced manual Python grouping with `.values().annotate(Sum())` database aggregation
+- Eliminated iteration over potentially 30K+ aggregate records in Python
+- Modified `_create_signal` to fetch related aggregates from DB instead of passing them
+- **Expected Performance**: 10-50x faster for large datasets, reduced memory usage
+- **Verified**: All 6 DenialScope tests pass successfully
+- **Impact**: Faster signal computation, reduced application memory usage
 
 ---
 
@@ -573,22 +598,22 @@ Run: `python manage.py migrate token_blacklist`
 
 ## Progress Tracking
 
-**Current Status**: Phase 1 - In Progress (5/10 Critical Issues Resolved - 50%)
+**Current Status**: Phase 1 - In Progress (6/10 Critical Issues Resolved - 60%)
 
 ### Issues by Status
 
 | Status | Count | % |
 |--------|-------|---|
-| To Do | 126 | 96.2% |
+| To Do | 125 | 95.4% |
 | In Progress | 0 | 0% |
-| Done | 5 | 3.8% |
+| Done | 6 | 4.6% |
 
 ### By Domain Completion
 
 | Domain | Issues | Fixed | % Complete |
 |--------|--------|-------|------------|
 | Security | 10 | 0 | 0% |
-| Performance | 18 | 1 | 5.6% |
+| Performance | 18 | 2 | 11.1% |
 | Testing | 17 | 0 | 0% |
 | Architecture | 21 | 0 | 0% |
 | Database | 22 | 1 | 4.5% |
@@ -600,6 +625,7 @@ Run: `python manage.py migrate token_blacklist`
 - ✅ **CRIT-2**: Migration safety checks in CI/CD (.github/workflows/deploy.yml)
 - ✅ **CRIT-3**: TextField to CharField with indexes for payer/CPT (upstream/models.py)
 - ✅ **CRIT-4**: N+1 query in drift computation (upstream/services/payer_drift.py)
+- ✅ **CRIT-5**: DenialScope Python iteration to DB aggregation (upstream/products/denialscope/services.py)
 - ✅ **CRIT-9**: Insecure .env file permissions (startup validation)
 
 ---

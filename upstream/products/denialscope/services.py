@@ -25,12 +25,12 @@ class DenialScopeComputationService:
     def compute(self, start_date=None, end_date=None, min_volume=10):
         """
         Compute aggregates and signals for a date range.
-        
+
         Args:
             start_date: Start date (inclusive). Defaults to 30 days ago.
             end_date: End date (exclusive). Defaults to today.
             min_volume: Minimum volume threshold for signals.
-        
+
         Returns:
             dict with computed aggregates count and signals count
         """
@@ -44,7 +44,7 @@ class DenialScopeComputationService:
             DenialAggregate.objects.filter(
                 customer=self.customer,
                 aggregate_date__gte=start_date,
-                aggregate_date__lt=end_date
+                aggregate_date__lt=end_date,
             ).delete()
 
             # Compute daily aggregates
@@ -55,17 +55,17 @@ class DenialScopeComputationService:
             DenialSignal.objects.filter(
                 customer=self.customer,
                 window_start_date__gte=start_date,
-                window_end_date__lte=end_date
+                window_end_date__lte=end_date,
             ).delete()
 
             # Compute signals
             signals = self._compute_signals(start_date, end_date, min_volume)
 
             return {
-                'aggregates_created': len(aggregates),
-                'signals_created': len(signals),
-                'start_date': start_date,
-                'end_date': end_date,
+                "aggregates_created": len(aggregates),
+                "signals_created": len(signals),
+                "start_date": start_date,
+                "end_date": end_date,
             }
 
     def _compute_daily_aggregates(self, start_date, end_date):
@@ -79,38 +79,40 @@ class DenialScopeComputationService:
 
         # Aggregate by day, payer, and denial reason
         aggregates_qs = base_qs.values(
-            'submitted_date',
-            'payer',
-            'denial_reason_code',
-            'denial_reason_text',
+            "submitted_date",
+            "payer",
+            "denial_reason_code",
+            "denial_reason_text",
         ).annotate(
-            total_submitted_count=Count('id'),
-            total_submitted_dollars=Sum('allowed_amount'),
-            denied_count=Count('id', filter=Q(outcome='DENIED')),
-            denied_dollars=Sum('allowed_amount', filter=Q(outcome='DENIED')),
+            total_submitted_count=Count("id"),
+            total_submitted_dollars=Sum("allowed_amount"),
+            denied_count=Count("id", filter=Q(outcome="DENIED")),
+            denied_dollars=Sum("allowed_amount", filter=Q(outcome="DENIED")),
         )
 
         aggregates = []
         for row in aggregates_qs:
-            total_submitted = row['total_submitted_count'] or 0
-            denied_count = row['denied_count'] or 0
+            total_submitted = row["total_submitted_count"] or 0
+            denied_count = row["denied_count"] or 0
 
             denial_rate = 0.0
             if total_submitted > 0:
                 denial_rate = denied_count / total_submitted
 
-            denial_reason = row['denial_reason_code'] or row['denial_reason_text'] or 'DENIED'
+            denial_reason = (
+                row["denial_reason_code"] or row["denial_reason_text"] or "DENIED"
+            )
 
             aggregate = DenialAggregate(
                 customer=self.customer,
-                payer=row['payer'],
+                payer=row["payer"],
                 denial_reason=denial_reason,
                 cpt_code=None,
-                aggregate_date=row['submitted_date'],
+                aggregate_date=row["submitted_date"],
                 denied_count=denied_count,
-                denied_dollars=row['denied_dollars'] or 0,
+                denied_dollars=row["denied_dollars"] or 0,
                 total_submitted_count=total_submitted,
-                total_submitted_dollars=row['total_submitted_dollars'] or 0,
+                total_submitted_dollars=row["total_submitted_dollars"] or 0,
                 denial_rate=denial_rate,
             )
             aggregates.append(aggregate)
@@ -127,62 +129,37 @@ class DenialScopeComputationService:
         baseline_end = recent_start
         baseline_start = max(start_date, baseline_end - timedelta(days=21))
 
-        # Fetch aggregates for baseline and recent
-        baseline_aggregates = DenialAggregate.objects.filter(
-            customer=self.customer,
-            aggregate_date__gte=baseline_start,
-            aggregate_date__lt=baseline_end
-        )
-
-        recent_aggregates = DenialAggregate.objects.filter(
-            customer=self.customer,
-            aggregate_date__gte=recent_start,
-            aggregate_date__lt=recent_end
-        )
-
-        # Group aggregates by payer and reason
-        def group_aggregates(aggregates_qs):
-            grouped = {}
-            for agg in aggregates_qs:
-                key = (agg.payer, agg.denial_reason)
-                if key not in grouped:
-                    grouped[key] = {
-                        'denied_count': 0,
-                        'denied_dollars': 0,
-                        'total_submitted_count': 0,
-                        'total_submitted_dollars': 0,
-                        'aggregates': []
-                    }
-                grouped[key]['denied_count'] += agg.denied_count
-                grouped[key]['denied_dollars'] += float(agg.denied_dollars)
-                grouped[key]['total_submitted_count'] += agg.total_submitted_count
-                grouped[key]['total_submitted_dollars'] += float(agg.total_submitted_dollars)
-                grouped[key]['aggregates'].append(agg)
-            return grouped
-
-        baseline_grouped = group_aggregates(baseline_aggregates)
-        recent_grouped = group_aggregates(recent_aggregates)
+        # CRIT-5: Use database aggregation instead of Python iteration
+        # Group aggregates by payer and denial_reason using database query
+        baseline_grouped = self._group_aggregates_in_db(baseline_start, baseline_end)
+        recent_grouped = self._group_aggregates_in_db(recent_start, recent_end)
 
         signals = []
 
         # Signal 1: New denial reason emergence
         for key, recent_data in recent_grouped.items():
             payer, denial_reason = key
-            if key not in baseline_grouped and recent_data['denied_count'] >= min_volume:
+            if (
+                key not in baseline_grouped
+                and recent_data["denied_count"] >= min_volume
+            ):
                 signal = self._create_signal(
-                    signal_type='new_denial_reason',
+                    signal_type="new_denial_reason",
                     payer=payer,
                     denial_reason=denial_reason,
                     window_start=recent_start,
                     window_end=recent_end,
-                    severity='high',
+                    severity="high",
                     confidence=0.8,
-                    summary=f"New denial reason '{denial_reason}' appeared for {payer} with {recent_data['denied_count']} denials",
+                    summary=(
+                        f"New denial reason '{denial_reason}' appeared for {payer} "
+                        f"with {recent_data['denied_count']} denials"
+                    ),
                     details={
-                        'denied_count': recent_data['denied_count'],
-                        'recent_window': f"{recent_start} to {recent_end}"
+                        "denied_count": recent_data["denied_count"],
+                        "recent_window": f"{recent_start} to {recent_end}",
                     },
-                    aggregates=recent_data['aggregates']
+                    aggregates=recent_data["aggregates"],
                 )
                 signals.append(signal)
 
@@ -194,36 +171,58 @@ class DenialScopeComputationService:
                 continue
 
             baseline_denial_rate = 0
-            if baseline_data['total_submitted_count'] > 0:
-                baseline_denial_rate = baseline_data['denied_count'] / baseline_data['total_submitted_count']
+            if baseline_data["total_submitted_count"] > 0:
+                baseline_denial_rate = (
+                    baseline_data["denied_count"]
+                    / baseline_data["total_submitted_count"]
+                )
 
             recent_denial_rate = 0
-            if recent_data['total_submitted_count'] > 0:
-                recent_denial_rate = recent_data['denied_count'] / recent_data['total_submitted_count']
+            if recent_data["total_submitted_count"] > 0:
+                recent_denial_rate = (
+                    recent_data["denied_count"] / recent_data["total_submitted_count"]
+                )
 
-            if recent_data['total_submitted_count'] >= min_volume and baseline_data['total_submitted_count'] >= min_volume:
+            if (
+                recent_data["total_submitted_count"] >= min_volume
+                and baseline_data["total_submitted_count"] >= min_volume
+            ):
                 rate_delta = recent_denial_rate - baseline_denial_rate
-                if rate_delta >= 0.05 or (baseline_denial_rate > 0 and rate_delta / baseline_denial_rate >= 0.5):
+                if rate_delta >= 0.05 or (
+                    baseline_denial_rate > 0
+                    and rate_delta / baseline_denial_rate >= 0.5
+                ):
                     severity = self._severity_from_delta(rate_delta)
-                    confidence = min((recent_data['total_submitted_count'] + baseline_data['total_submitted_count']) / (min_volume * 4), 1.0)
+                    confidence = min(
+                        (
+                            recent_data["total_submitted_count"]
+                            + baseline_data["total_submitted_count"]
+                        )
+                        / (min_volume * 4),
+                        1.0,
+                    )
 
                     signal = self._create_signal(
-                        signal_type='denial_rate_spike',
+                        signal_type="denial_rate_spike",
                         payer=payer,
                         denial_reason=denial_reason,
                         window_start=recent_start,
                         window_end=recent_end,
                         severity=severity,
                         confidence=confidence,
-                        summary=f"Denial rate spiked for {payer} ({denial_reason}) from {baseline_denial_rate:.1%} to {recent_denial_rate:.1%}",
+                        summary=(
+                            f"Denial rate spiked for {payer} ({denial_reason}) "
+                            f"from {baseline_denial_rate:.1%} "
+                            f"to {recent_denial_rate:.1%}"
+                        ),
                         details={
-                            'baseline_denial_rate': baseline_denial_rate,
-                            'recent_denial_rate': recent_denial_rate,
-                            'rate_delta': rate_delta,
-                            'baseline_count': baseline_data['total_submitted_count'],
-                            'recent_count': recent_data['total_submitted_count']
+                            "baseline_denial_rate": baseline_denial_rate,
+                            "recent_denial_rate": recent_denial_rate,
+                            "rate_delta": rate_delta,
+                            "baseline_count": baseline_data["total_submitted_count"],
+                            "recent_count": recent_data["total_submitted_count"],
                         },
-                        aggregates=recent_data['aggregates']
+                        aggregates=recent_data["aggregates"],
                     )
                     signals.append(signal)
 
@@ -235,22 +234,27 @@ class DenialScopeComputationService:
                 continue
 
             # Prefer dollars if available
-            if baseline_data['denied_dollars'] > 0 and recent_data['denied_dollars'] > 0:
-                baseline_value = baseline_data['denied_dollars']
-                recent_value = recent_data['denied_dollars']
-                signal_type = 'denial_dollars_spike'
-                label = 'denial dollars'
+            if (
+                baseline_data["denied_dollars"] > 0
+                and recent_data["denied_dollars"] > 0
+            ):
+                baseline_value = baseline_data["denied_dollars"]
+                recent_value = recent_data["denied_dollars"]
+                signal_type = "denial_dollars_spike"
+                label = "denial dollars"
             else:
-                baseline_value = baseline_data['denied_count']
-                recent_value = recent_data['denied_count']
-                signal_type = 'denial_volume_spike'
-                label = 'denial volume'
+                baseline_value = baseline_data["denied_count"]
+                recent_value = recent_data["denied_count"]
+                signal_type = "denial_volume_spike"
+                label = "denial volume"
 
             if baseline_value >= min_volume and recent_value >= min_volume:
                 delta = recent_value - baseline_value
                 if baseline_value > 0 and delta / baseline_value >= 0.5:
                     severity = self._severity_from_delta(delta / baseline_value)
-                    confidence = min((recent_value + baseline_value) / (min_volume * 4), 1.0)
+                    confidence = min(
+                        (recent_value + baseline_value) / (min_volume * 4), 1.0
+                    )
 
                     signal = self._create_signal(
                         signal_type=signal_type,
@@ -260,31 +264,80 @@ class DenialScopeComputationService:
                         window_end=recent_end,
                         severity=severity,
                         confidence=confidence,
-                        summary=f"{label.title()} spiked for {payer} ({denial_reason}) from {baseline_value:.0f} to {recent_value:.0f}",
+                        summary=(
+                            f"{label.title()} spiked for {payer} ({denial_reason}) "
+                            f"from {baseline_value:.0f} to {recent_value:.0f}"
+                        ),
                         details={
-                            'baseline_value': baseline_value,
-                            'recent_value': recent_value,
-                            'delta': delta,
-                            'metric': label
+                            "baseline_value": baseline_value,
+                            "recent_value": recent_value,
+                            "delta": delta,
+                            "metric": label,
                         },
-                        aggregates=recent_data['aggregates']
+                        aggregates=recent_data["aggregates"],
                     )
                     signals.append(signal)
 
         return signals
 
+    def _group_aggregates_in_db(self, start_date, end_date):
+        """
+        Group aggregates by payer and denial_reason using database aggregation.
+
+        Returns dict keyed by (payer, denial_reason) with summed values.
+        """
+        # Use database aggregation to group by payer and denial_reason
+        grouped_data = (
+            DenialAggregate.objects.filter(
+                customer=self.customer,
+                aggregate_date__gte=start_date,
+                aggregate_date__lt=end_date,
+            )
+            .values("payer", "denial_reason")
+            .annotate(
+                total_denied=Sum("denied_count"),
+                total_denied_dollars=Sum("denied_dollars"),
+                total_submitted=Sum("total_submitted_count"),
+                total_submitted_dollars=Sum("total_submitted_dollars"),
+            )
+        )
+
+        # Convert to dict keyed by (payer, denial_reason)
+        result = {}
+        for row in grouped_data:
+            key = (row["payer"], row["denial_reason"])
+            result[key] = {
+                "denied_count": row["total_denied"] or 0,
+                "denied_dollars": float(row["total_denied_dollars"] or 0),
+                "total_submitted_count": row["total_submitted"] or 0,
+                "total_submitted_dollars": float(row["total_submitted_dollars"] or 0),
+                "aggregates": [],  # Populated on-demand when creating signals
+            }
+        return result
+
     def _severity_from_delta(self, delta):
         """Map delta ratio to severity level."""
         if delta >= 1.0:
-            return 'critical'
+            return "critical"
         if delta >= 0.75:
-            return 'high'
+            return "high"
         if delta >= 0.5:
-            return 'medium'
-        return 'low'
+            return "medium"
+        return "low"
 
-    def _create_signal(self, signal_type, payer, denial_reason, window_start, window_end,
-                       severity, confidence, summary, details, aggregates):
+    def _create_signal(
+        self,
+        signal_type,
+        payer,
+        denial_reason,
+        window_start,
+        window_end,
+        severity,
+        confidence,
+        summary,
+        details,
+        aggregates,
+    ):
         """Create signal and publish SystemEvent."""
         signal = DenialSignal.objects.create(
             customer=self.customer,
@@ -299,22 +352,31 @@ class DenialScopeComputationService:
             details=details,
         )
 
-        if aggregates:
-            signal.related_aggregates.add(*aggregates)
+        # CRIT-5: Fetch related aggregates from DB instead of passing them
+        # This is more efficient when using database aggregation
+        related_aggs = DenialAggregate.objects.filter(
+            customer=self.customer,
+            payer=payer,
+            denial_reason=denial_reason,
+            aggregate_date__gte=window_start,
+            aggregate_date__lt=window_end,
+        )
+        if related_aggs.exists():
+            signal.related_aggregates.add(*related_aggs)
 
         # Publish SystemEvent
         publish_event(
             customer=self.customer,
-            event_type='denialscope_signal_created',
+            event_type="denialscope_signal_created",
             payload={
-                'title': f"DenialScope: {signal.get_signal_type_display()}",
-                'summary': summary,
-                'signal_type': signal_type,
-                'payer': payer,
-                'denial_reason': denial_reason,
-                'severity': severity,
-                'details': details
-            }
+                "title": f"DenialScope: {signal.get_signal_type_display()}",
+                "summary": summary,
+                "signal_type": signal_type,
+                "payer": payer,
+                "denial_reason": denial_reason,
+                "severity": severity,
+                "details": details,
+            },
         )
 
         return signal
