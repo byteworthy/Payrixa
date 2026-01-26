@@ -27,7 +27,7 @@ jobs:
 
     - name: Run Ruff linter
       run: |
-        ruff check . --output-format=github || true
+        ruff check . --output-format=github
 
     - name: Check Python syntax
       run: |

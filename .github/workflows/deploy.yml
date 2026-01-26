@@ -60,3 +60,16 @@ jobs:
         echo "- Google Cloud Run"
         echo "- Azure Container Apps"
         echo "- Railway, Render, or Fly.io"
+
+    # TODO: Add actual deployment step here (Cloud Run, ECS, etc.)
+    # - name: Deploy to staging/production
+    #   run: |
+    #     gcloud run deploy upstream ...
+
+    - name: Run smoke tests
+      if: vars.DEPLOYMENT_URL != ''
+      run: |
+        pip install requests
+        python scripts/smoke_test.py --url "${{ vars.DEPLOYMENT_URL }}" --max-retries 3 --retry-delay 10
+      env:
+        DEPLOYMENT_URL: ${{ vars.DEPLOYMENT_URL }}

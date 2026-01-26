@@ -489,6 +489,12 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
         else:
             queryset = queryset.none()
 
+        # Apply pagination to prevent OOM on large result sets
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = DriftEventSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
         serializer = DriftEventSerializer(queryset, many=True)
         return Response(serializer.data)
 

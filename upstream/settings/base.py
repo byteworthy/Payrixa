@@ -67,6 +67,15 @@ MIDDLEWARE = [
 
 X_FRAME_OPTIONS = "DENY"
 
+# =============================================================================
+# SECURITY & DATA UPLOAD LIMITS
+# =============================================================================
+
+# Limit request body size to prevent DoS attacks via huge webhook payloads
+# 10 MB limit (reasonable for structured JSON data, prevents memory exhaustion)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
+
 ROOT_URLCONF = "hello_world.urls"
 
 TEMPLATES = [
