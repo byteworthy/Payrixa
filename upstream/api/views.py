@@ -234,17 +234,34 @@ class SettingsViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         summary="List uploads",
         description=(
             "Retrieve a paginated list of file uploads with filtering and "
-            "search. Returns summary data for performance."
+            "search. Returns summary data for performance. Supports pagination "
+            "with page and page_size query parameters."
         ),
         tags=["Uploads"],
         parameters=[
             OpenApiParameter(
+                name="page",
+                type=int,
+                description="Page number for pagination (default: 1)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                description="Number of results per page (default: 100, max: 1000)",
+                required=False,
+            ),
+            OpenApiParameter(
                 name="status",
                 type=str,
                 description="Filter by upload status (success, failed, processing)",
+                required=False,
             ),
             OpenApiParameter(
-                name="search", type=str, description="Search by filename or status"
+                name="search",
+                type=str,
+                description="Search by filename or status",
+                required=False,
             ),
             OpenApiParameter(
                 name="ordering",
@@ -253,6 +270,53 @@ class SettingsViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
                     "Order by: uploaded_at, status, row_count "
                     "(prefix with - for descending)"
                 ),
+                required=False,
+            ),
+        ],
+        examples=[
+            OpenApiExample(
+                "Paginated Response",
+                value={
+                    "count": 150,
+                    "next": "https://api.example.com/api/uploads/?page=2&page_size=10",
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 1,
+                            "filename": "claims_2024_Q1.csv",
+                            "status": "success",
+                            "uploaded_at": "2024-01-15T10:30:00Z",
+                            "row_count": 5000,
+                        },
+                        {
+                            "id": 2,
+                            "filename": "claims_2024_Q2.csv",
+                            "status": "processing",
+                            "uploaded_at": "2024-04-20T14:22:00Z",
+                            "row_count": 0,
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Filtered by Status",
+                value={
+                    "count": 5,
+                    "next": None,
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 3,
+                            "filename": "claims_2024_Q3.csv",
+                            "status": "failed",
+                            "uploaded_at": "2024-07-10T09:15:00Z",
+                            "row_count": 0,
+                            "error_message": "Invalid CSV format",
+                        },
+                    ],
+                },
+                response_only=True,
             ),
         ],
     ),
@@ -338,11 +402,13 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         summary="Get upload statistics",
         description=(
             "Retrieve aggregated upload statistics including total uploads, "
-            "success/failed counts, and total rows processed."
+            "success/failed/processing counts, and total claim records across "
+            "all uploads. Uses optimized single-query aggregation for performance."
         ),
         tags=["Uploads"],
-        responses={
-            200: OpenApiExample(
+        responses={200: dict},
+        examples=[
+            OpenApiExample(
                 "Upload Statistics",
                 value={
                     "total": 150,
@@ -352,8 +418,8 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
                     "total_rows": 125000,
                 },
                 response_only=True,
-            )
-        },
+            ),
+        ],
     )
     @action(detail=False, methods=["get"])
     def stats(self, request):
@@ -387,42 +453,64 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
         description=(
             "Retrieve a paginated list of claim records with filtering, "
             "search, and ordering. Returns summary data for performance. "
-            "Rate limited to 2000 requests/hour."
+            "Rate limited to 2000 requests/hour. Supports pagination with "
+            "page and page_size query parameters."
         ),
         tags=["Claims"],
         parameters=[
             OpenApiParameter(
-                name="payer", type=str, description="Filter by payer name"
+                name="page",
+                type=int,
+                description="Page number for pagination (default: 1)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                description="Number of results per page (default: 100, max: 1000)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="payer",
+                type=str,
+                description="Filter by payer name (exact match)",
+                required=False,
             ),
             OpenApiParameter(
                 name="outcome",
                 type=str,
                 description="Filter by claim outcome (PAID, DENIED, OTHER)",
+                required=False,
             ),
             OpenApiParameter(
                 name="submitted_date_after",
                 type=OpenApiTypes.DATE,
                 description="Filter claims submitted after this date (YYYY-MM-DD)",
+                required=False,
             ),
             OpenApiParameter(
                 name="submitted_date_before",
                 type=OpenApiTypes.DATE,
                 description="Filter claims submitted before this date (YYYY-MM-DD)",
+                required=False,
             ),
             OpenApiParameter(
                 name="decided_date_after",
                 type=OpenApiTypes.DATE,
                 description="Filter claims decided after this date (YYYY-MM-DD)",
+                required=False,
             ),
             OpenApiParameter(
                 name="decided_date_before",
                 type=OpenApiTypes.DATE,
                 description="Filter claims decided before this date (YYYY-MM-DD)",
+                required=False,
             ),
             OpenApiParameter(
                 name="search",
                 type=str,
                 description="Search by payer, CPT code, or denial reason code",
+                required=False,
             ),
             OpenApiParameter(
                 name="ordering",
@@ -431,6 +519,87 @@ class UploadViewSet(CustomerFilterMixin, viewsets.ModelViewSet):
                     "Order by: decided_date, submitted_date, payer, outcome "
                     "(prefix with - for descending)"
                 ),
+                required=False,
+            ),
+        ],
+        examples=[
+            OpenApiExample(
+                "Paginated Response",
+                value={
+                    "count": 125000,
+                    "next": "https://api.example.com/api/claims/?page=2&page_size=10",
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 1,
+                            "payer": "Blue Cross Blue Shield",
+                            "cpt": "99213",
+                            "outcome": "PAID",
+                            "submitted_date": "2024-01-10",
+                            "decided_date": "2024-01-25",
+                            "allowed_amount": "150.00",
+                        },
+                        {
+                            "id": 2,
+                            "payer": "Aetna",
+                            "cpt": "99214",
+                            "outcome": "DENIED",
+                            "submitted_date": "2024-01-12",
+                            "decided_date": "2024-01-28",
+                            "allowed_amount": "0.00",
+                            "denial_reason_code": "CO-97",
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Filtered by Payer and Outcome",
+                value={
+                    "count": 45,
+                    "next": (
+                        "https://api.example.com/api/claims/"
+                        "?payer=Aetna&outcome=DENIED&page=2"
+                    ),
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 5,
+                            "payer": "Aetna",
+                            "cpt": "99215",
+                            "outcome": "DENIED",
+                            "submitted_date": "2024-01-20",
+                            "decided_date": "2024-02-05",
+                            "allowed_amount": "0.00",
+                            "denial_reason_code": "CO-16",
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Filtered by Date Range",
+                value={
+                    "count": 350,
+                    "next": (
+                        "https://api.example.com/api/claims/"
+                        "?submitted_date_after=2024-01-01"
+                        "&submitted_date_before=2024-01-31&page=2"
+                    ),
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 10,
+                            "payer": "UnitedHealthcare",
+                            "cpt": "99213",
+                            "outcome": "PAID",
+                            "submitted_date": "2024-01-15",
+                            "decided_date": "2024-01-30",
+                            "allowed_amount": "145.00",
+                        },
+                    ],
+                },
+                response_only=True,
             ),
         ],
     ),
@@ -481,22 +650,99 @@ class ClaimRecordViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         summary="Get payer summary statistics",
+        description=(
+            "Retrieve aggregated statistics by payer including total claims, "
+            "paid/denied counts, denial rates, and average allowed amounts. "
+            "Defaults to last 90 days for performance. Cached for 15 minutes. "
+            "Results are paginated."
+        ),
+        tags=["Claims"],
         responses={200: PayerSummarySerializer(many=True)},
         parameters=[
-            {
-                "name": "start_date",
-                "in": "query",
-                "description": "Start date (YYYY-MM-DD). Defaults to 90 days ago.",
-                "required": False,
-                "schema": {"type": "string", "format": "date"},
-            },
-            {
-                "name": "end_date",
-                "in": "query",
-                "description": "End date (YYYY-MM-DD). Defaults to today.",
-                "required": False,
-                "schema": {"type": "string", "format": "date"},
-            },
+            OpenApiParameter(
+                name="start_date",
+                type=OpenApiTypes.DATE,
+                description="Start date (YYYY-MM-DD). Defaults to 90 days ago.",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="end_date",
+                type=OpenApiTypes.DATE,
+                description="End date (YYYY-MM-DD). Defaults to today.",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                description="Page number for pagination",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                description="Number of results per page",
+                required=False,
+            ),
+        ],
+        examples=[
+            OpenApiExample(
+                "Payer Summary Response",
+                value={
+                    "count": 15,
+                    "next": "https://api.example.com/api/claims/payer_summary/?page=2",
+                    "previous": None,
+                    "results": [
+                        {
+                            "payer": "Blue Cross Blue Shield",
+                            "total_claims": 5234,
+                            "paid_count": 4812,
+                            "denied_count": 398,
+                            "other_count": 24,
+                            "denial_rate": 7.61,
+                            "avg_allowed_amount": "187.50",
+                        },
+                        {
+                            "payer": "Aetna",
+                            "total_claims": 3156,
+                            "paid_count": 2789,
+                            "denied_count": 345,
+                            "other_count": 22,
+                            "denial_rate": 10.93,
+                            "avg_allowed_amount": "165.23",
+                        },
+                        {
+                            "payer": "UnitedHealthcare",
+                            "total_claims": 2890,
+                            "paid_count": 2601,
+                            "denied_count": 276,
+                            "other_count": 13,
+                            "denial_rate": 9.55,
+                            "avg_allowed_amount": "192.45",
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Custom Date Range",
+                value={
+                    "count": 12,
+                    "next": None,
+                    "previous": None,
+                    "results": [
+                        {
+                            "payer": "Cigna",
+                            "total_claims": 1256,
+                            "paid_count": 1089,
+                            "denied_count": 152,
+                            "other_count": 15,
+                            "denial_rate": 12.10,
+                            "avg_allowed_amount": "175.89",
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
         ],
     )
     @action(detail=False, methods=["get"])
@@ -646,7 +892,8 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
         description=(
             "Trigger a new payer drift report run. Creates a report run and "
             "queues async processing to detect payer behavior drift. "
-            "Rate limited to 10 requests/hour."
+            "Rate limited to 10 requests/hour. Returns immediately with "
+            "report run ID; processing continues asynchronously."
         ),
         tags=["Reports"],
         request=None,
@@ -658,6 +905,20 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
                 response_only=True,
             ),
         },
+        examples=[
+            OpenApiExample(
+                "Report Triggered",
+                value={
+                    "id": 42,
+                    "run_type": "weekly",
+                    "status": "running",
+                    "started_at": "2024-01-25T10:30:00Z",
+                    "finished_at": None,
+                    "drift_event_count": 0,
+                },
+                response_only=True,
+            ),
+        ],
     )
     @action(detail=False, methods=["post"], throttle_classes=[ReportGenerationThrottle])
     def trigger(self, request):
@@ -692,33 +953,61 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
         summary="List drift events",
         description=(
             "Retrieve a paginated list of drift events with filtering, "
-            "search, and ordering. Rate limited to 2000 requests/hour."
+            "search, and ordering. Rate limited to 2000 requests/hour. "
+            "Supports pagination with page and page_size query parameters."
         ),
         tags=["Drift Detection"],
         parameters=[
             OpenApiParameter(
-                name="payer", type=str, description="Filter by payer name"
+                name="page",
+                type=int,
+                description="Page number for pagination (default: 1)",
+                required=False,
             ),
             OpenApiParameter(
-                name="cpt_group", type=str, description="Filter by CPT group"
+                name="page_size",
+                type=int,
+                description="Number of results per page (default: 100, max: 1000)",
+                required=False,
             ),
             OpenApiParameter(
-                name="drift_type", type=str, description="Filter by drift type"
+                name="payer",
+                type=str,
+                description="Filter by payer name (exact match)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="cpt_group",
+                type=str,
+                description="Filter by CPT group (exact match)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="drift_type",
+                type=str,
+                description=(
+                    "Filter by drift type "
+                    "(denial_rate, decision_time, allowed_amount)"
+                ),
+                required=False,
             ),
             OpenApiParameter(
                 name="severity_min",
                 type=OpenApiTypes.FLOAT,
                 description="Filter by minimum severity (0.0-1.0)",
+                required=False,
             ),
             OpenApiParameter(
                 name="severity_max",
                 type=OpenApiTypes.FLOAT,
                 description="Filter by maximum severity (0.0-1.0)",
+                required=False,
             ),
             OpenApiParameter(
                 name="search",
                 type=str,
                 description="Search by payer, CPT group, or drift type",
+                required=False,
             ),
             OpenApiParameter(
                 name="ordering",
@@ -727,6 +1016,67 @@ class ReportRunViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
                     "Order by: created_at, severity, payer "
                     "(prefix with - for descending)"
                 ),
+                required=False,
+            ),
+        ],
+        examples=[
+            OpenApiExample(
+                "Paginated Response",
+                value={
+                    "count": 42,
+                    "next": (
+                        "https://api.example.com/api/drift-events/"
+                        "?page=2&page_size=10"
+                    ),
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 1,
+                            "payer": "Blue Cross Blue Shield",
+                            "cpt_group": "Office Visits",
+                            "drift_type": "denial_rate",
+                            "severity": 0.85,
+                            "baseline_value": "5.2",
+                            "current_value": "18.7",
+                            "delta_value": "13.5",
+                            "created_at": "2024-01-15T10:30:00Z",
+                        },
+                        {
+                            "id": 2,
+                            "payer": "Aetna",
+                            "cpt_group": "Imaging",
+                            "drift_type": "decision_time",
+                            "severity": 0.72,
+                            "baseline_value": "12.3",
+                            "current_value": "28.9",
+                            "delta_value": "16.6",
+                            "created_at": "2024-01-15T10:30:00Z",
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Filtered by Severity",
+                value={
+                    "count": 8,
+                    "next": None,
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 5,
+                            "payer": "UnitedHealthcare",
+                            "cpt_group": "Surgery",
+                            "drift_type": "allowed_amount",
+                            "severity": 0.92,
+                            "baseline_value": "1500.00",
+                            "current_value": "950.00",
+                            "delta_value": "-550.00",
+                            "created_at": "2024-01-15T10:30:00Z",
+                        },
+                    ],
+                },
+                response_only=True,
             ),
         ],
     ),
@@ -762,18 +1112,62 @@ class DriftEventViewSet(CustomerFilterMixin, viewsets.ReadOnlyModelViewSet):
         summary="Get active drift events",
         description=(
             "Retrieve drift events from the most recent successful report "
-            "run. Returns paginated results."
+            "run. Returns only drift events that are still active (not resolved). "
+            "Results are paginated for performance."
         ),
         tags=["Drift Detection"],
         parameters=[
             OpenApiParameter(
-                name="page", type=int, description="Page number for pagination"
+                name="page",
+                type=int,
+                description="Page number for pagination (default: 1)",
+                required=False,
             ),
             OpenApiParameter(
-                name="page_size", type=int, description="Number of results per page"
+                name="page_size",
+                type=int,
+                description="Number of results per page (default: 100)",
+                required=False,
             ),
         ],
         responses={200: DriftEventSerializer(many=True)},
+        examples=[
+            OpenApiExample(
+                "Active Drift Events",
+                value={
+                    "count": 15,
+                    "next": "https://api.example.com/api/drift-events/active/?page=2",
+                    "previous": None,
+                    "results": [
+                        {
+                            "id": 1,
+                            "payer": "Blue Cross Blue Shield",
+                            "cpt_group": "Office Visits",
+                            "drift_type": "denial_rate",
+                            "severity": 0.92,
+                            "baseline_value": "5.2",
+                            "current_value": "18.7",
+                            "delta_value": "13.5",
+                            "created_at": "2024-01-20T10:30:00Z",
+                            "report_run": 42,
+                        },
+                        {
+                            "id": 2,
+                            "payer": "Aetna",
+                            "cpt_group": "Imaging",
+                            "drift_type": "decision_time",
+                            "severity": 0.87,
+                            "baseline_value": "12.3",
+                            "current_value": "28.9",
+                            "delta_value": "16.6",
+                            "created_at": "2024-01-20T10:30:00Z",
+                            "report_run": 42,
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+        ],
     )
     @action(detail=False, methods=["get"])
     def active(self, request):
@@ -933,8 +1327,9 @@ class DashboardView(APIView):
         summary="Get dashboard overview",
         description=(
             "Retrieve dashboard overview data including claim statistics, "
-            "upload counts, active drift events, denial rate trends, and top "
-            "drift payers. Cached for 5 minutes."
+            "upload counts, active drift events, denial rate trends (last 6 months), "
+            "and top 5 drift payers by severity. Cached for 5 minutes to reduce "
+            "database load."
         ),
         tags=["Dashboard"],
         responses={
@@ -945,6 +1340,83 @@ class DashboardView(APIView):
                 response_only=True,
             ),
         },
+        examples=[
+            OpenApiExample(
+                "Dashboard Overview",
+                value={
+                    "total_claims": 125000,
+                    "total_uploads": 42,
+                    "active_drift_events": 15,
+                    "last_report_date": "2024-01-20T10:30:00Z",
+                    "denial_rate_trend": [
+                        {
+                            "month": "2023-08",
+                            "denial_rate": 8.5,
+                            "total_claims": 18500,
+                            "denied_claims": 1573,
+                        },
+                        {
+                            "month": "2023-09",
+                            "denial_rate": 9.2,
+                            "total_claims": 19200,
+                            "denied_claims": 1766,
+                        },
+                        {
+                            "month": "2023-10",
+                            "denial_rate": 10.1,
+                            "total_claims": 20100,
+                            "denied_claims": 2030,
+                        },
+                        {
+                            "month": "2023-11",
+                            "denial_rate": 11.5,
+                            "total_claims": 21000,
+                            "denied_claims": 2415,
+                        },
+                        {
+                            "month": "2023-12",
+                            "denial_rate": 12.3,
+                            "total_claims": 22500,
+                            "denied_claims": 2768,
+                        },
+                        {
+                            "month": "2024-01",
+                            "denial_rate": 13.8,
+                            "total_claims": 23700,
+                            "denied_claims": 3271,
+                        },
+                    ],
+                    "top_drift_payers": [
+                        {
+                            "payer": "Blue Cross Blue Shield",
+                            "severity": 0.92,
+                            "delta_value": "15.3",
+                        },
+                        {
+                            "payer": "Aetna",
+                            "severity": 0.87,
+                            "delta_value": "12.8",
+                        },
+                        {
+                            "payer": "UnitedHealthcare",
+                            "severity": 0.79,
+                            "delta_value": "9.5",
+                        },
+                        {
+                            "payer": "Cigna",
+                            "severity": 0.71,
+                            "delta_value": "7.2",
+                        },
+                        {
+                            "payer": "Humana",
+                            "severity": 0.68,
+                            "delta_value": "6.8",
+                        },
+                    ],
+                },
+                response_only=True,
+            ),
+        ],
     )
     def get(self, request):
         customer = get_user_customer(request.user)
