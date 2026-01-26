@@ -35,6 +35,7 @@ from upstream.views.celery_health import (
     celery_tasks,
     celery_stats,
 )
+from upstream.views.monitoring_status import monitoring_status
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -51,6 +52,8 @@ router.register(r"alerts", AlertEventViewSet, basename="alert-event")
 urlpatterns = [
     # Health check (no auth)
     path("health/", HealthCheckView.as_view(), name="api-health"),
+    # Monitoring status (no auth - for monitoring tools)
+    path("monitoring/status/", monitoring_status, name="monitoring-status"),
     # Celery health checks (no auth - for monitoring tools)
     path("celery/health/", celery_health_check, name="celery-health"),
     path("celery/tasks/", celery_tasks, name="celery-tasks"),

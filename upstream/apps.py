@@ -13,6 +13,8 @@ class UpstreamConfig(AppConfig):
 
         Validates .env file permissions to prevent exposure of sensitive
         credentials (FIELD_ENCRYPTION_KEY, SECRET_KEY, DB_PASSWORD).
+
+        Also registers monitoring system checks for production validation.
         """
         from upstream.env_permissions import check_env_permissions
 
@@ -24,3 +26,7 @@ class UpstreamConfig(AppConfig):
 
         # Validate permissions (skips if .env doesn't exist or in CI)
         check_env_permissions(env_file, strict=strict)
+
+        # Register monitoring checks (Phase 3 - Task #5)
+        # Import monitoring_checks to register Django system checks
+        import upstream.monitoring_checks  # noqa: F401
