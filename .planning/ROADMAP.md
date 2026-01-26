@@ -29,11 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Database rejects duplicate records on key fields (email, claim numbers, tenant+user combinations)
   3. Unique constraint migrations deploy to production without downtime or data loss
   4. Transaction isolation prevents race conditions in drift computation and alert creation
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Add transaction isolation with select_for_update() to drift detection
+- [ ] 01-02-PLAN.md — Implement unique constraints via three-phase migrations
 
 ### Phase 2: API Pagination & Filtering
 **Goal**: All API list endpoints support pagination and user-driven filtering for large datasets
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Transaction Isolation & Unique Constraints | 0/TBD | Not started | - |
+| 1. Transaction Isolation & Unique Constraints | 0/2 | Ready | - |
 | 2. API Pagination & Filtering | 0/TBD | Not started | - |
 | 3. OpenAPI Documentation & Error Standardization | 0/TBD | Not started | - |
 | 4. Webhook & RBAC Testing | 0/TBD | Not started | - |
