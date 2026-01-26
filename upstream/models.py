@@ -749,10 +749,46 @@ class CPTGroupMapping(models.Model):
 
 
 # Import models from submodules to ensure Django migrations detect them
-from upstream.core.models import *  # noqa: F401, F403, E402
-from upstream.core.validation_models import *  # noqa: F401, F403, E402
-from upstream.alerts.models import *  # noqa: F401, F403, E402
-from upstream.integrations.models import *  # noqa: F401, F403, E402
-from upstream.reporting.models import *  # noqa: F401, F403, E402
-from upstream.products.denialscope.models import *  # noqa: F401, F403, E402
-from upstream.products.delayguard.models import *  # noqa: F401, F403, E402
+# HIGH-4: Replace wildcard imports with explicit imports
+from upstream.core.models import (  # noqa: F401, E402
+    BaseModel,
+    SystemConfiguration,
+    DomainAuditEvent,
+    ProductConfig,
+)
+from upstream.core.validation_models import (  # noqa: F401, E402
+    ValidationRule,
+    ValidationResult,
+    DataQualityMetric,
+    ClaimValidationHistory,
+    DataAnomalyDetection,
+)
+from upstream.alerts.models import (  # noqa: F401, E402
+    AlertRule,
+    NotificationChannel,
+    AlertEvent,
+    Alert,
+    OperatorJudgment,
+)
+from upstream.integrations.models import (  # noqa: F401, E402
+    IntegrationProvider,
+    IntegrationConnection,
+    IntegrationLog,
+    WebhookEndpoint,
+    WebhookDelivery,
+)
+from upstream.reporting.models import (  # noqa: F401, E402
+    ReportTemplate,
+    ScheduledReport,
+    ReportArtifact,
+)
+from upstream.products.denialscope.models import (  # noqa: F401, E402
+    DenialAggregate,
+    DenialSignal,
+)
+from upstream.products.delayguard.models import (  # noqa: F401, E402
+    PaymentDelayAggregate,
+    PaymentDelaySignal,
+    PaymentDelayClaimSet,
+    PaymentDelayEvidenceArtifact,
+)
