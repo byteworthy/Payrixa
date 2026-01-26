@@ -70,9 +70,9 @@ class EvaluateDriftEventTests(TestCase):
             customer=self.customer,
             name="High Denial Rate Alert",
             enabled=True,
-            rule_type="denial_rate",
-            threshold_value=Decimal("0.10"),  # Trigger if delta > 10%
-            notification_channels="email",
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.70,  # Trigger if severity >= 0.70
         )
 
         # Evaluate drift event
@@ -93,9 +93,9 @@ class EvaluateDriftEventTests(TestCase):
             customer=self.customer,
             name="Very High Denial Rate Alert",
             enabled=True,
-            rule_type="denial_rate",
-            threshold_value=Decimal("0.50"),  # Too high to trigger
-            notification_channels="email",
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.95,  # Too high to trigger (drift event has 0.75)
         )
 
         # Evaluate drift event
@@ -110,9 +110,9 @@ class EvaluateDriftEventTests(TestCase):
             customer=self.customer,
             name="Disabled Alert",
             enabled=False,  # Disabled
-            rule_type="denial_rate",
-            threshold_value=Decimal("0.05"),
-            notification_channels="email",
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.50,  # Would trigger, but disabled
         )
 
         alert_events = evaluate_drift_event(self.drift_event)
@@ -125,9 +125,9 @@ class EvaluateDriftEventTests(TestCase):
             customer=self.customer,
             name="Test Rule",
             enabled=True,
-            rule_type="denial_rate",
-            threshold_value=Decimal("0.10"),
-            notification_channels="email",
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.70,
         )
 
         # First evaluation - should create alert
@@ -151,9 +151,9 @@ class EvaluateDriftEventTests(TestCase):
             customer=self.customer,
             name="Audit Test Rule",
             enabled=True,
-            rule_type="denial_rate",
-            threshold_value=Decimal("0.10"),
-            notification_channels="email",
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.70,
         )
 
         # Evaluate and create alert
@@ -238,12 +238,22 @@ class AlertSuppressionTests(TestCase):
         """Create test fixtures."""
         self.customer = Customer.objects.create(name="Suppression Test Corp")
 
+        self.alert_rule = AlertRule.objects.create(
+            customer=self.customer,
+            name="Test Suppression Rule",
+            enabled=True,
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.70,
+        )
+
     def test_suppression_cooldown_period(self):
         """Test that recent alerts trigger cooldown suppression."""
         # Create recent alert (2 hours ago)
         recent_time = timezone.now() - timedelta(hours=2)
         recent_alert = AlertEvent.objects.create(
             customer=self.customer,
+            alert_rule=self.alert_rule,
             triggered_at=recent_time,
             status="delivered",
             payload={
@@ -275,6 +285,7 @@ class AlertSuppressionTests(TestCase):
             past_time = timezone.now() - timedelta(days=10 + i)
             alert = AlertEvent.objects.create(
                 customer=self.customer,
+                alert_rule=self.alert_rule,
                 triggered_at=past_time,
                 status="resolved",
                 payload={
@@ -310,6 +321,7 @@ class AlertSuppressionTests(TestCase):
         # Create recent alert for Payer A
         recent_alert = AlertEvent.objects.create(
             customer=self.customer,
+            alert_rule=self.alert_rule,
             triggered_at=timezone.now() - timedelta(hours=1),
             status="delivered",
             payload={
@@ -341,6 +353,15 @@ class SendEmailNotificationTests(TestCase):
     def setUp(self):
         """Create test fixtures."""
         self.customer = Customer.objects.create(name="Email Test Corp")
+
+        self.alert_rule = AlertRule.objects.create(
+            customer=self.customer,
+            name="Test Email Rule",
+            enabled=True,
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.70,
+        )
 
         self.report_run = ReportRun.objects.create(
             customer=self.customer,
@@ -374,6 +395,7 @@ class SendEmailNotificationTests(TestCase):
 
         self.alert_event = AlertEvent.objects.create(
             customer=self.customer,
+            alert_rule=self.alert_rule,
             drift_event=self.drift_event,
             triggered_at=timezone.now(),
             status="pending",
@@ -433,6 +455,15 @@ class GetSuppressionContextTests(TestCase):
         """Create test fixtures."""
         self.customer = Customer.objects.create(name="Context Test Corp")
 
+        self.alert_rule = AlertRule.objects.create(
+            customer=self.customer,
+            name="Test Context Rule",
+            enabled=True,
+            metric="severity",
+            threshold_type="gte",
+            threshold_value=0.70,
+        )
+
         self.report_run = ReportRun.objects.create(
             customer=self.customer,
             status="success",
@@ -458,6 +489,7 @@ class GetSuppressionContextTests(TestCase):
 
         self.alert_event = AlertEvent.objects.create(
             customer=self.customer,
+            alert_rule=self.alert_rule,
             drift_event=self.drift_event,
             triggered_at=timezone.now(),
             status="pending",
@@ -474,6 +506,7 @@ class GetSuppressionContextTests(TestCase):
         # Create historical alert marked as noise
         past_alert = AlertEvent.objects.create(
             customer=self.customer,
+            alert_rule=self.alert_rule,
             drift_event=self.drift_event,
             triggered_at=timezone.now() - timedelta(days=5),
             status="resolved",
@@ -521,6 +554,7 @@ class GetSuppressionContextTests(TestCase):
 
         new_alert = AlertEvent.objects.create(
             customer=self.customer,
+            alert_rule=self.alert_rule,
             drift_event=new_drift,
             triggered_at=timezone.now(),
             status="pending",
