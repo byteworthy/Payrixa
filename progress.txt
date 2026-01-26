@@ -153,3 +153,49 @@ Story: #2 - Add @extend_schema examples for complex endpoints
 
 ### Status
 ✅ Story #2 already complete - no code changes needed
+
+## Iteration 3 - 2026-01-26T23:33:30Z
+Story: #3 - Document authentication flow with examples
+
+### Implementation
+- Added comprehensive authentication flow documentation to upstream/api/views.py module docstring
+- Documented JWT authentication workflow:
+  * Login: POST /auth/token/ with username/password → receives access + refresh tokens
+  * API Requests: Include "Authorization: Bearer <token>" header
+  * Token Refresh: POST /auth/token/refresh/ with refresh token → new access token
+  * Token Verify: POST /auth/token/verify/ to check token validity
+- Documented token expiration: access tokens (1 hour), refresh tokens (24 hours)
+- Enhanced JWT authentication endpoint examples:
+  * ThrottledTokenObtainPairView: Login examples with success/401/429 responses
+  * ThrottledTokenRefreshView: Refresh token flow with examples
+  * ThrottledTokenVerifyView: Token verification with valid/invalid examples
+- Added RBAC roles and permissions documentation:
+  * Superuser: Full access across all customers, bypass tenant isolation
+  * Customer Admin (customer_admin): Full CRUD access to customer's data
+  * Customer Viewer (customer_viewer): Read-only access to customer's data
+  * All roles enforced via CustomerFilterMixin with automatic tenant filtering
+- Added authorization examples to protected endpoints:
+  * Upload create endpoint: Shows 401 (missing auth), 403 (insufficient permissions)
+
+### Key Decisions
+- Placed authentication flow documentation in module docstring for discoverability
+- Used realistic JWT token examples (not actual tokens, but proper format)
+- Documented both success and error scenarios for each endpoint
+- Included rate limiting information (5 login attempts per 15 minutes)
+- Explained tenant isolation behavior and how it affects API access
+
+### Learnings
+- OpenApiExample supports status_codes parameter to associate examples with responses
+- Module-level docstrings are excellent for high-level authentication documentation
+- JWT authentication examples should show proper Bearer token format
+- RBAC documentation helps developers understand permission requirements
+- Error response examples (401, 403, 429) are crucial for API usability
+
+### Status
+✅ Story #3 completed and committed (commit: 2a4e057d)
+- Login endpoint has comprehensive request/response examples
+- Token refresh and verify endpoints fully documented
+- RBAC roles and permissions clearly explained
+- Authorization header usage documented with examples
+- OpenAPI schema validates with 0 errors
+- 64/67 API tests pass (3 pre-existing failures unrelated to changes)

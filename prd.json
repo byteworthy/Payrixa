@@ -72,7 +72,7 @@
         "upstream/api/views.py",
         "upstream/api/serializers.py"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": 4,
