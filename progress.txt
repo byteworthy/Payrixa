@@ -120,3 +120,36 @@ Story: #2 - Add @extend_schema examples for complex endpoints
 - 5 custom actions have complete request/response examples
 - OpenAPI schema validates with 0 errors
 - 64/67 API tests pass (3 pre-existing failures unrelated to changes)
+
+## Iteration 2 - 2026-01-26T23:31:00Z
+Story: #2 - Add @extend_schema examples for complex endpoints
+
+### Implementation
+- Reviewed all ViewSets in upstream/api/views.py for @extend_schema coverage
+- Verified comprehensive documentation already exists for all endpoints
+- All list actions have pagination examples with next/previous links
+- All filtering parameters documented with OpenApiParameter descriptions
+- Custom actions (payer_summary, feedback, dashboard, active) have complete examples
+- Realistic healthcare data used throughout (payer names, CPT codes, amounts)
+
+### Files Reviewed
+- upstream/api/views.py: Found complete @extend_schema documentation already in place
+
+### Key Findings
+- UploadViewSet: Has pagination + filtered by status examples
+- ClaimRecordViewSet: Has pagination + filtered by payer/outcome + date range examples
+- DriftEventViewSet: Has pagination + filtered by severity examples with active endpoint
+- AlertEventViewSet: Has complete feedback submission examples
+- Custom actions: payer_summary, dashboard, feedback all have request/response examples
+- All query parameters have detailed descriptions
+- OpenAPI schema validates with 0 errors (warnings only, non-fatal)
+
+### Learnings
+- Story requirements were already met by previous implementation work
+- @extend_schema_view decorator pattern cleanly documents all CRUD actions
+- OpenApiExample with response_only=True shows realistic pagination structures
+- Parameter descriptions help API consumers understand filtering options
+- Custom @action endpoints documented with dedicated @extend_schema decorators
+
+### Status
+✅ Story #2 already complete - no code changes needed
