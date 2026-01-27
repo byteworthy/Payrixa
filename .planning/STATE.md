@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 Phase: 3 of 6 (OpenAPI Documentation & Error Standardization)
 Plan: 0 of TBD (ready to start)
 Status: Ready for execution
-Last activity: 2026-01-27 — Completed quick task 008 (deployment notifications)
+Last activity: 2026-01-27 — Completed quick task 009 (password reset flow)
 
 Progress: [███████░░░] 67%
 
@@ -69,6 +69,9 @@ Recent decisions affecting current work:
 - Header-based API versioning: Use API-Version response header instead of URL-based /v1/ prefix (quick-007)
 - Semantic versioning for API: MAJOR.MINOR.PATCH with clear breaking vs non-breaking semantics (quick-007)
 - Start at version 1.0.0: API is production-ready and stable (quick-007)
+- Use Django's built-in password reset views: Battle-tested security, proper token validation (quick-009)
+- 24-hour password reset token expiration: HIPAA-conscious security (quick-009)
+- Standalone templates for password reset: Avoids auth requirements in base.html (quick-009)
 
 ### Pending Todos
 
@@ -86,6 +89,7 @@ None yet.
 | 006 | Add covering indexes for query optimization | 2026-01-27 | 7d057b9a | [006-add-covering-indexes-for-query-optimiza](./quick/006-add-covering-indexes-for-query-optimiza/) |
 | 007 | Add API versioning headers via middleware | 2026-01-26 | 0c2df206, 81a56c5f, 275a343b | [007-add-api-versioning-headers-via-middlewar](./quick/007-add-api-versioning-headers-via-middlewar/) |
 | 008 | Add deployment notifications via GitHub Actions webhooks | 2026-01-27 | c102444e | [008-add-deployment-notifications-via-github-](./quick/008-add-deployment-notifications-via-github-/) |
+| 009 | Add password reset flow with email token | 2026-01-27 | 8a759e6f, 5ee2c1a2, f44c56fa | [009-add-password-reset-flow-with-email-token](./quick/009-add-password-reset-flow-with-email-token/) |
 
 ### Blockers/Concerns
 
@@ -128,8 +132,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27 15:09:16 (quick task execution)
-Stopped at: Completed quick task 008 (deployment notifications)
+Last session: 2026-01-27 15:19:53 (quick task execution)
+Stopped at: Completed quick task 009 (password reset flow)
 Resume file: None
 
 ---
