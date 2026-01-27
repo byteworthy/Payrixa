@@ -333,6 +333,17 @@ CELERY_BEAT_SCHEDULE = {
 CELERY_ENABLED = config("CELERY_ENABLED", default=False, cast=bool)
 
 # =============================================================================
+# FLOWER CONFIGURATION
+# =============================================================================
+
+# Flower Configuration
+# Dashboard for monitoring Celery workers, tasks, and queues
+FLOWER_BASIC_AUTH_USERNAME = config('FLOWER_BASIC_AUTH_USERNAME', default='admin')
+FLOWER_BASIC_AUTH_PASSWORD = config('FLOWER_BASIC_AUTH_PASSWORD', default='flower_dev_pass')
+FLOWER_PORT = config('FLOWER_PORT', default='5555', cast=int)
+# Note: In production, use strong password and consider additional security (VPN, firewall rules, OAuth)
+
+# =============================================================================
 # V1 FEATURE FLAGS
 # =============================================================================
 
