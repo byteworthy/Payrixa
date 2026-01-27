@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 Phase: 3 of 6 (OpenAPI Documentation & Error Standardization)
 Plan: 0 of TBD (ready to start)
 Status: Ready for execution
-Last activity: 2026-01-27 — Completed quick task 025 (Add property-based testing with Hypothesis)
+Last activity: 2026-01-27 — Completed quick task 030 (Add database migration testing automation)
 
 Progress: [███████░░░] 67%
 
@@ -101,6 +101,11 @@ Recent decisions affecting current work:
 - Hypothesis configured with 100 examples: Balance thoroughness with CI time using max_examples=100, derandomize=true, deadline=None (quick-025)
 - Property-based tests in dedicated test class: 19 @given tests across 5 test classes (Customer, ClaimRecord, Upload, Serializers, Constraints) (quick-025)
 - Use .hypothesis/ cache directory: Enables reproducible test runs and failure investigation via example database (quick-025)
+- Test only last 5 migrations per app: Production deployments only care about recent migrations, avoid testing entire history (quick-030)
+- Skip Django contrib apps in rollback tests: Our upstream app migrations are what we control and must validate (quick-030)
+- Separate workflow for migration tests: Enables parallel execution and independent failure tracking (quick-030)
+- PostgreSQL 15 required for migration testing: SQLite has different migration behavior, must test against production engine (quick-030)
+- All-checks aggregation job in CI: Single required check for GitHub branch protection, aggregates test/performance/backup results (quick-030)
 
 ### Pending Todos
 
@@ -134,6 +139,7 @@ None yet.
 | 024 | Configure alert routing for platform health monitoring | 2026-01-27 | 8ad4f87b, 472fafa8, a4c03230 | [024-configure-alert-routing-set-up-aler](./quick/024-configure-alert-routing-set-up-aler/) |
 | 025 | Add property-based testing with Hypothesis | 2026-01-27 | 55be5906 | [025-add-property-based-testing-with-hypo](./quick/025-add-property-based-testing-with-hypo/) |
 | 027 | Expand health check endpoint with detailed checks | 2026-01-27 | df784ef3, 7717a03c, cec5c9e3, 7d93b835 | [027-expand-health-check-endpoint-add-det](./quick/027-expand-health-check-endpoint-add-det/) |
+| 030 | Add database migration testing automation | 2026-01-27 | 87d822b3, 2f0ca2eb | [030-add-database-migration-testing-autom](./quick/030-add-database-migration-testing-autom/) |
 
 ### Blockers/Concerns
 
@@ -176,8 +182,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27 16:41:02 (quick task execution)
-Stopped at: Completed quick task 027 (expand health check endpoint with detailed checks)
+Last session: 2026-01-27 16:55:08 (quick task execution)
+Stopped at: Completed quick task 030 (add database migration testing automation)
 Resume file: None
 
 ---
