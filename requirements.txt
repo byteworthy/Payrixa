@@ -65,3 +65,4 @@ pytest-django~=4.9.0
 pytest-cov~=6.0.0
 responses~=0.25.0
 factory-boy~=3.3.0
+hypothesis~=6.92.0
