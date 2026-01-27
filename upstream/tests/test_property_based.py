@@ -1,10 +1,10 @@
 """
-Property-based testing with Hypothesis for Upstream Healthcare Platform.
+Property-based testing with Hypothesis for Upstream Healthcare.
 
-Property-based testing discovers edge cases through automated fuzzing, generating
-hundreds of test inputs to validate invariants and constraints. Hypothesis explores
-the input space more thoroughly than manual test cases, catching corner cases that
-humans often miss.
+Property-based testing discovers edge cases through automated
+fuzzing, generating hundreds of test inputs to validate invariants
+and constraints. Hypothesis explores the input space more thoroughly
+than manual test cases, catching corner cases that humans often miss.
 
 This test suite covers:
 - Model validation and constraints (Customer, Upload, ClaimRecord)
@@ -18,7 +18,9 @@ Tests use Hypothesis strategies to generate diverse inputs:
 - Dates within business-relevant ranges
 - Dictionaries for JSON fuzzing
 
-Run with: pytest upstream/tests/test_property_based.py -v --hypothesis-show-statistics
+Run with:
+  pytest upstream/tests/test_property_based.py -v
+    --hypothesis-show-statistics
 
 Configuration: See pytest.ini [hypothesis] section
 - max_examples=100: Generates 100 test cases per @given test
@@ -26,23 +28,16 @@ Configuration: See pytest.ini [hypothesis] section
 - deadline=None: No timeout for slow property tests
 """
 
-from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from hypothesis import given, example, assume, strategies as st
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.test import TestCase
 
-from upstream.models import Customer, Settings, Upload, ClaimRecord
-from upstream.api.serializers import (
-    CustomerSerializer,
-    UploadSerializer,
-    ClaimRecordSerializer,
-    PayerSummarySerializer,
-)
-
+from upstream.models import Customer, Upload, ClaimRecord
+from upstream.api.serializers import CustomerSerializer, UploadSerializer
 
 # =============================================================================
 # Test Class 1: Customer Model Property Tests
@@ -58,8 +53,9 @@ class TestCustomerPropertyTests:
     @example("A")
     @example("Z" * 255)
     def test_customer_name_validation_with_fuzzing(self, name):
-        """Test that Customer handles various string inputs for name field."""
-        # Filter out whitespace-only strings (Django CharField strips and rejects)
+        """Test Customer handles various string inputs for name."""
+        # Filter out whitespace-only strings
+        # (Django CharField strips and rejects)
         assume(name.strip())
 
         # Create customer with fuzzed name
@@ -162,7 +158,8 @@ class TestClaimRecordPropertyTests:
     def test_claim_amount_rejects_negative(self, amount):
         """Test that negative amounts are rejected."""
         # Negative amounts should fail validation
-        # Note: Model doesn't have explicit validator, but business logic should reject
+        # Note: Model doesn't have explicit validator,
+        # but business logic should reject
         claim = ClaimRecord(
             customer=self.customer,
             upload=self.upload,
@@ -216,7 +213,8 @@ class TestClaimRecordPropertyTests:
     @given(
         st.text(
             alphabet=st.characters(
-                whitelist_categories=("Lu", "Ll", "Nd"), blacklist_characters=""
+                whitelist_categories=("Lu", "Ll", "Nd"),
+                blacklist_characters="",
             ),
             min_size=1,
             max_size=20,
@@ -226,7 +224,7 @@ class TestClaimRecordPropertyTests:
     @example("J1234")
     @example("00001")
     def test_claim_cpt_code_formats(self, cpt_code):
-        """Test that CPT codes handle various alphanumeric formats."""
+        """Test CPT codes handle various alphanumeric formats."""
         claim = ClaimRecord.objects.create(
             customer=self.customer,
             upload=self.upload,
@@ -262,14 +260,18 @@ class TestClaimRecordPropertyTests:
         # Cleanup
         claim.delete()
 
-    @given(st.text(min_size=1, max_size=50).filter(lambda x: x not in ["PAID", "DENIED", "OTHER"]))
+    @given(
+        st.text(min_size=1, max_size=50).filter(
+            lambda x: x not in ["PAID", "DENIED", "OTHER"]
+        )
+    )
     def test_claim_outcome_rejects_invalid(self, outcome):
         """Test that invalid outcome values are rejected."""
         from django.db.utils import DataError
 
         # Invalid outcome should raise validation or database error
         with pytest.raises((ValidationError, DataError, IntegrityError)):
-            claim = ClaimRecord.objects.create(
+            ClaimRecord.objects.create(
                 customer=self.customer,
                 upload=self.upload,
                 payer="Test Payer",
@@ -330,12 +332,12 @@ class TestUploadPropertyTests:
 
     @given(st.integers(min_value=-1000, max_value=-1))
     def test_upload_row_count_rejects_negative(self, row_count):
-        """Test that negative row counts are rejected by CHECK constraint."""
+        """Test negative row counts rejected by CHECK constraint."""
         from django.db.utils import IntegrityError as DBIntegrityError
 
         # Negative row_count should violate CHECK constraint
         with pytest.raises((ValidationError, DBIntegrityError, IntegrityError)):
-            upload = Upload.objects.create(
+            Upload.objects.create(
                 customer=self.customer,
                 filename="test.csv",
                 status="success",
@@ -395,8 +397,8 @@ class TestAPISerializerPropertyTests:
         )
     )
     def test_customer_serializer_handles_malformed_input(self, input_data):
-        """Test that CustomerSerializer validates and rejects malformed input gracefully."""
-        # Serializer should validate input without raising unhandled exceptions
+        """Test CustomerSerializer validates malformed input gracefully."""
+        # Serializer validates input without unhandled exceptions
         serializer = CustomerSerializer(data=input_data)
 
         # Validation may succeed or fail, but should never raise exception
@@ -411,7 +413,9 @@ class TestAPISerializerPropertyTests:
 
     @given(
         st.dictionaries(
-            keys=st.sampled_from(["filename", "status", "row_count", "date_min", "date_max"]),
+            keys=st.sampled_from(
+                ["filename", "status", "row_count", "date_min", "date_max"]
+            ),
             values=st.one_of(
                 st.text(max_size=100),
                 st.integers(min_value=-1000, max_value=1000000),
@@ -482,7 +486,9 @@ class TestConstraintPropertyTests:
             Customer.objects.create(name=name)
 
         # Verify error mentions UNIQUE constraint
-        assert "UNIQUE" in str(exc_info.value).upper() or "unique" in str(exc_info.value)
+        assert "UNIQUE" in str(exc_info.value).upper() or "unique" in str(
+            exc_info.value
+        )
 
         # Cleanup
         customer1.delete()
