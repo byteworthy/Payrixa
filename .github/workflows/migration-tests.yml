@@ -1,0 +1,67 @@
+name: Migration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  migration-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres  # pragma: allowlist secret
+          POSTGRES_DB: migration_test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libcairo2 \
+          libpango-1.0-0 \
+          libpangocairo-1.0-0 \
+          libgdk-pixbuf2.0-0 \
+          shared-mime-info
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Set up environment
+      run: |
+        cp .env.example .env
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/migration_test_db" >> .env  # pragma: allowlist secret
+        echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
+        echo "DEBUG=True" >> .env
+
+    - name: Run migration test script
+      run: |
+        python scripts/test_migrations.py --verbose
+
+    - name: Print PostgreSQL logs on failure
+      if: failure()
+      run: |
+        echo "=== PostgreSQL Service Logs ==="
+        docker logs $(docker ps -q --filter ancestor=postgres:15) || echo "Could not retrieve PostgreSQL logs"
