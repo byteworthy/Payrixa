@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-01-27T00:00:00Z",
+  "commit": "8a5b79d9",
+  "metrics": {
+    "p50": 120.0,
+    "p95": 350.0,
+    "p99": 480.0,
+    "avg_response_time": 150.0,
+    "requests_per_sec": 15.0,
+    "error_rate": 0.5,
+    "total_requests": 450,
+    "failure_count": 2
+  },
+  "notes": "Initial baseline from Phase 5 completion - realistic CI runner performance"
+}
