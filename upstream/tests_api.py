@@ -1189,3 +1189,127 @@ class ErrorHandlingTests(APITestBase):
             self.assertTrue(
                 error["details"] is None or isinstance(error["details"], dict)
             )
+
+
+class ETagCachingTests(APITestBase):
+    """Test ETag support for API responses (quick-010)."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        super().setUp()
+        # Create an upload to test with
+        self.upload = Upload.objects.create(
+            customer=self.customer_a,
+            filename="test_claims.csv",
+            status="success",
+            uploaded_by=self.user_a,
+            row_count=100,
+        )
+
+    def test_get_response_includes_etag(self):
+        """Test that GET requests return ETag header."""
+        self.authenticate_as(self.user_a)
+
+        response = self.client.get(f"{API_BASE}/uploads/")
+
+        # Should return 200 with ETag header
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("ETag", response)
+        self.assertIsNotNone(response["ETag"])
+
+        # ETag should be a quoted string (MD5 hash format)
+        etag = response["ETag"]
+        self.assertTrue(etag.startswith('"') and etag.endswith('"'))
+
+        # Should also have Cache-Control header
+        self.assertIn("Cache-Control", response)
+        cache_control = response["Cache-Control"]
+        self.assertIn("max-age=60", cache_control)
+        self.assertIn("must-revalidate", cache_control)
+
+    def test_if_none_match_returns_304(self):
+        """Test that If-None-Match with matching ETag returns 304 Not Modified."""
+        self.authenticate_as(self.user_a)
+
+        # First request to get ETag
+        response1 = self.client.get(f"{API_BASE}/uploads/")
+        self.assertEqual(response1.status_code, 200)
+        etag = response1["ETag"]
+
+        # Second request with If-None-Match header
+        response2 = self.client.get(f"{API_BASE}/uploads/", HTTP_IF_NONE_MATCH=etag)
+
+        # Should return 304 Not Modified with no body
+        self.assertEqual(response2.status_code, 304)
+        self.assertEqual(len(response2.content), 0)
+
+        # ETag should still be present in 304 response
+        self.assertEqual(response2["ETag"], etag)
+
+    def test_if_none_match_mismatch_returns_200(self):
+        """Test If-None-Match with non-matching ETag returns 200."""
+        self.authenticate_as(self.user_a)
+
+        # Request with non-matching ETag
+        fake_etag = '"fake-etag-12345"'
+        response = self.client.get(f"{API_BASE}/uploads/", HTTP_IF_NONE_MATCH=fake_etag)
+
+        # Should return 200 with full response body
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("results", response.data)
+        self.assertGreater(len(response.content), 0)
+
+        # Should return new ETag that differs from fake one
+        self.assertIn("ETag", response)
+        self.assertNotEqual(response["ETag"], fake_etag)
+
+    def test_post_request_has_no_cache(self):
+        """Test that non-GET responses have no-cache headers."""
+        self.authenticate_as(self.user_a)
+
+        # Test DELETE request (simpler than POST/PUT)
+        response = self.client.delete(f"{API_BASE}/uploads/{self.upload.id}/")
+
+        # Should return 204 No Content
+        self.assertEqual(response.status_code, 204)
+
+        # Should have Cache-Control: no-cache, no-store
+        self.assertIn("Cache-Control", response)
+        cache_control = response["Cache-Control"]
+        self.assertIn("no-cache", cache_control)
+        self.assertIn("no-store", cache_control)
+        self.assertIn("must-revalidate", cache_control)
+
+        # Non-GET responses still get ETags from ConditionalGetMiddleware
+        # but they shouldn't be used for caching due to no-cache directive
+
+    def test_etag_changes_when_content_changes(self):
+        """Test that ETag changes after content is modified."""
+        self.authenticate_as(self.user_a)
+
+        # First request to get initial ETag
+        response1 = self.client.get(f"{API_BASE}/uploads/")
+        self.assertEqual(response1.status_code, 200)
+        etag1 = response1["ETag"]
+
+        # Create a new upload to change the content
+        Upload.objects.create(
+            customer=self.customer_a,
+            filename="another_claims.csv",
+            status="success",
+            uploaded_by=self.user_a,
+            row_count=200,
+        )
+
+        # Second request should have different ETag
+        response2 = self.client.get(f"{API_BASE}/uploads/")
+        self.assertEqual(response2.status_code, 200)
+        etag2 = response2["ETag"]
+
+        # ETags should differ because content changed
+        self.assertNotEqual(etag1, etag2)
+
+        # Using old ETag with If-None-Match should return 200 (not 304)
+        response3 = self.client.get(f"{API_BASE}/uploads/", HTTP_IF_NONE_MATCH=etag1)
+        self.assertEqual(response3.status_code, 200)
+        self.assertGreater(len(response3.content), 0)
