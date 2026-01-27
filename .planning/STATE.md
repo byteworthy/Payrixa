@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 Phase: 3 of 6 (OpenAPI Documentation & Error Standardization)
 Plan: 0 of TBD (ready to start)
 Status: Ready for execution
-Last activity: 2026-01-27 — Completed quick task 030 (Add database migration testing automation)
+Last activity: 2026-01-27 — Completed quick task 029 (Add performance regression tests)
 
 Progress: [███████░░░] 67%
 
@@ -106,6 +106,10 @@ Recent decisions affecting current work:
 - Separate workflow for migration tests: Enables parallel execution and independent failure tracking (quick-030)
 - PostgreSQL 15 required for migration testing: SQLite has different migration behavior, must test against production engine (quick-030)
 - All-checks aggregation job in CI: Single required check for GitHub branch protection, aggregates test/performance/backup results (quick-030)
+- Baseline-driven regression detection: Historical comparison detects gradual degradation (p95 >20%, errors >2%) better than fixed thresholds (quick-029)
+- Bootstrap mode for baselines: Creates initial baseline automatically on first run without manual setup (quick-029)
+- Version-controlled performance baselines: perf_baseline.json tracked in git ensures consistent CI checks across branches (quick-029)
+- Warning vs failure distinction: p95/errors fail CI, p50/p99/throughput warn only - balances signal vs noise (quick-029)
 
 ### Pending Todos
 
@@ -139,6 +143,7 @@ None yet.
 | 024 | Configure alert routing for platform health monitoring | 2026-01-27 | 8ad4f87b, 472fafa8, a4c03230 | [024-configure-alert-routing-set-up-aler](./quick/024-configure-alert-routing-set-up-aler/) |
 | 025 | Add property-based testing with Hypothesis | 2026-01-27 | 55be5906 | [025-add-property-based-testing-with-hypo](./quick/025-add-property-based-testing-with-hypo/) |
 | 027 | Expand health check endpoint with detailed checks | 2026-01-27 | df784ef3, 7717a03c, cec5c9e3, 7d93b835 | [027-expand-health-check-endpoint-add-det](./quick/027-expand-health-check-endpoint-add-det/) |
+| 029 | Add performance regression tests | 2026-01-27 | fe7a6c66, ede84636 | [029-add-performance-regression-tests-crea](./quick/029-add-performance-regression-tests-crea/) |
 | 030 | Add database migration testing automation | 2026-01-27 | 87d822b3, 2f0ca2eb | [030-add-database-migration-testing-autom](./quick/030-add-database-migration-testing-autom/) |
 
 ### Blockers/Concerns
@@ -182,8 +187,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27 16:55:08 (quick task execution)
-Stopped at: Completed quick task 030 (add database migration testing automation)
+Last session: 2026-01-27 17:05:00 (quick task execution)
+Stopped at: Completed quick task 029 (add performance regression tests)
 Resume file: None
 
 ---
