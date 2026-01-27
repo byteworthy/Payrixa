@@ -839,22 +839,30 @@ class CustomLogoutView(DjangoLogoutView):
     template_name = "upstream/logged_out.html"
 
     def dispatch(self, request, *args, **kwargs):
-        # Capture user context before logging out
+        # Capture user context BEFORE logout (instance variable, not session)
+        self._logout_context = {}
         if request.user.is_authenticated:
-            context = {}
             if request.user.is_superuser:
-                context["was_operator"] = True
-                context["username"] = request.user.username
+                self._logout_context["was_operator"] = True
+                self._logout_context["username"] = request.user.username
             elif hasattr(request.user, "profile") and request.user.profile:
-                context["was_operator"] = False
-                context["customer_name"] = request.user.profile.customer.name
-                context["role"] = request.user.profile.get_role_display()
-                context["username"] = request.user.username
+                self._logout_context["was_operator"] = False
+                self._logout_context[
+                    "customer_name"
+                ] = request.user.profile.customer.name
+                self._logout_context["role"] = request.user.profile.get_role_display()
+                self._logout_context["username"] = request.user.username
 
-            # Store in session before logout
-            request.session["logout_context"] = context
+        # Flush session to prevent fixation (clears data AND regenerates session key)
+        request.session.flush()
 
         return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Inject logout context from instance variable (survives session.flush())
+        context.update(getattr(self, "_logout_context", {}))
+        return context
 
 
 class AlertDeepDiveView(LoginRequiredMixin, TemplateView):
