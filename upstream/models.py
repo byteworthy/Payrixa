@@ -953,6 +953,250 @@ class CPTGroupMapping(models.Model):
         return f"{self.cpt_code} -> {self.cpt_group}"
 
 
+class RiskBaseline(models.Model):
+    """
+    Historical denial rate baselines for risk scoring.
+    Stores aggregated historical denial rates for each (customer, payer, CPT) combination.
+    Updated nightly by build_risk_baselines Celery task.
+    """
+
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="risk_baselines"
+    )
+    payer = models.CharField(max_length=255, db_index=True)
+    cpt = models.CharField(max_length=20, db_index=True)
+    denial_rate = models.FloatField(
+        help_text="Historical denial rate: denied / total claims",
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+    )
+    sample_size = models.IntegerField(
+        help_text="Number of claims in baseline calculation",
+        validators=[MinValueValidator(1)],
+    )
+    confidence_score = models.FloatField(
+        help_text="Statistical confidence: min(sample_size / 100, 1.0)",
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+    )
+    last_updated = models.DateTimeField(auto_now=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = CustomerScopedManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        db_table = "upstream_risk_baseline"
+        indexes = [
+            models.Index(
+                fields=["customer", "payer", "cpt"], name="risk_baseline_lookup_idx"
+            ),
+            models.Index(fields=["last_updated"], name="risk_baseline_updated_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["customer", "payer", "cpt"], name="unique_risk_baseline"
+            ),
+            models.CheckConstraint(
+                check=models.Q(confidence_score__gte=0.0)
+                & models.Q(confidence_score__lte=1.0),
+                name="risk_baseline_confidence_range",
+            ),
+            models.CheckConstraint(
+                check=models.Q(denial_rate__gte=0.0) & models.Q(denial_rate__lte=1.0),
+                name="risk_baseline_denial_rate_range",
+            ),
+            models.CheckConstraint(
+                check=models.Q(sample_size__gte=1),
+                name="risk_baseline_sample_size_positive",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.customer.name} - {self.payer} - {self.cpt}: {self.denial_rate:.1%}"
+
+
+class AutomationRule(models.Model):
+    """
+    Pre-approved workflow rules for autonomous execution.
+    Defines trigger conditions and actions for automated workflows.
+    """
+
+    RULE_TYPE_CHOICES = [
+        ("reauth", "Reauthorization Request"),
+        ("appeal", "Appeal Generation"),
+        ("high_risk_hold", "High Risk Hold"),
+    ]
+
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="automation_rules"
+    )
+    rule_type = models.CharField(max_length=20, choices=RULE_TYPE_CHOICES)
+    trigger_conditions = models.JSONField(
+        help_text="Conditions that trigger this rule (payer, cpt_code, etc.)"
+    )
+    actions = models.JSONField(
+        help_text="Actions to execute when triggered (action_type, etc.)"
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_executed = models.DateTimeField(null=True, blank=True)
+
+    objects = CustomerScopedManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        db_table = "upstream_automation_rule"
+        indexes = [
+            models.Index(
+                fields=["customer", "rule_type", "is_active"],
+                name="automation_rule_lookup_idx",
+            ),
+            models.Index(
+                fields=["is_active", "rule_type"], name="automation_rule_active_idx"
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rule_type__in=["reauth", "appeal", "high_risk_hold"]),
+                name="automation_rule_type_valid",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.customer.name} - {self.get_rule_type_display()}"
+
+
+class ExecutionLog(models.Model):
+    """
+    Audit trail for all autonomous action executions.
+    HIPAA-compliant logging of automated workflows.
+    """
+
+    RESULT_CHOICES = [
+        ("SUCCESS", "Success"),
+        ("FAILED", "Failed"),
+        ("ESCALATED", "Escalated to Alert"),
+    ]
+
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="execution_logs"
+    )
+    rule = models.ForeignKey(
+        AutomationRule,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="executions",
+        help_text="Rule that triggered this execution (nullable for ad-hoc actions)",
+    )
+    trigger_event = models.JSONField(
+        help_text="Event data that triggered the action: {type, claim_id, ...}"
+    )
+    action_taken = models.CharField(
+        max_length=50,
+        help_text="Action executed: submit_reauth, generate_appeal, etc.",
+    )
+    result = models.CharField(
+        max_length=20, choices=RESULT_CHOICES, default="SUCCESS", db_index=True
+    )
+    details = models.JSONField(
+        help_text="Execution details: outcomes, error messages, response data"
+    )
+    execution_time_ms = models.IntegerField(
+        help_text="Execution duration in milliseconds",
+        validators=[MinValueValidator(0)],
+    )
+    executed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    objects = CustomerScopedManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        db_table = "upstream_execution_log"
+        ordering = ["-executed_at"]
+        indexes = [
+            models.Index(
+                fields=["customer", "-executed_at"], name="execution_log_customer_idx"
+            ),
+            models.Index(fields=["rule", "result"], name="execution_log_rule_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.customer.name} - {self.action_taken} - {self.result}"
+
+
+class Authorization(models.Model):
+    """
+    Authorization tracking for ABA therapy with expiration monitoring.
+    Tracks authorizations with 30-day advance alerts for reauthorization.
+    """
+
+    STATUS_CHOICES = [
+        ("ACTIVE", "Active"),
+        ("EXPIRING_SOON", "Expiring Soon"),
+        ("EXPIRED", "Expired"),
+        ("RENEWED", "Renewed"),
+    ]
+
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="authorizations"
+    )
+    auth_number = models.CharField(
+        max_length=100, unique=True, help_text="Unique authorization number from payer"
+    )
+    patient_identifier = models.CharField(
+        max_length=255, help_text="Patient ID (should be encrypted in production)"
+    )
+    payer = models.CharField(max_length=255, db_index=True)
+    service_type = models.CharField(
+        max_length=100, help_text="e.g., ABA Therapy, Physical Therapy"
+    )
+    cpt_codes = models.JSONField(
+        help_text="List of authorized CPT codes: ['97151', '97153']"
+    )
+    auth_start_date = models.DateField()
+    auth_expiration_date = models.DateField(db_index=True)
+    units_authorized = models.IntegerField(validators=[MinValueValidator(1)])
+    units_used = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="ACTIVE", db_index=True
+    )
+    reauth_lead_time_days = models.IntegerField(
+        default=21,
+        validators=[MinValueValidator(1)],
+        help_text="Days before expiration to trigger reauth (default 21)",
+    )
+    auto_reauth_enabled = models.BooleanField(
+        default=False, help_text="Enable autonomous reauthorization submission"
+    )
+    last_alert_sent = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = CustomerScopedManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        db_table = "upstream_authorization"
+        indexes = [
+            models.Index(
+                fields=["customer", "status", "auth_expiration_date"],
+                name="authorization_expiring_idx",
+            ),
+            models.Index(
+                fields=["customer", "payer", "status"], name="authorization_payer_idx"
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(units_used__lte=models.F("units_authorized")),
+                name="authorization_units_valid",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.customer.name} - {self.auth_number} - {self.status}"
+
+
 # Import models from submodules to ensure Django migrations detect them
 # HIGH-4: Replace wildcard imports with explicit imports
 from upstream.core.models import (  # noqa: F401, E402

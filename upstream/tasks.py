@@ -265,6 +265,87 @@ def process_ingestion_task(ingestion_id: int) -> Dict[str, Any]:
         raise
 
 
+@shared_task(
+    bind=True,
+    base=MonitoredTask,
+    max_retries=3,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+)
+def process_claim_with_automation(
+    self, customer_id: int, fhir_payload: dict, source: str = "ehr_webhook"
+) -> dict:
+    """
+    Process incoming claim with automation rules evaluation.
+
+    Args:
+        customer_id: Customer ID
+        fhir_payload: FHIR R4 Claim resource
+        source: Source of claim (ehr_webhook, api, etc.)
+
+    Returns:
+        dict: Processing result with actions executed
+    """
+    from upstream.models import Customer
+    from upstream.automation.rules_engine import RulesEngine, Event
+    from datetime import datetime
+
+    logger.info(
+        f"Processing claim with automation for customer {customer_id}, source: {source}"
+    )
+
+    try:
+        # Load customer
+        customer = Customer.objects.get(id=customer_id)
+
+        # Simplified FHIR parsing for Week 1 (full parsing in Week 2)
+        claim_id = fhir_payload.get("id", "unknown")
+        patient_id = fhir_payload.get("patient", {}).get("reference", "unknown")
+        payer = fhir_payload.get("insurer", {}).get("display", "unknown")
+
+        # Create event for rules engine
+        event = Event(
+            event_type="claim_submitted",
+            customer_id=customer_id,
+            payload={
+                "claim_id": claim_id,
+                "patient_id": patient_id,
+                "payer": payer,
+                "source": source,
+                "fhir_data": fhir_payload,
+            },
+            timestamp=datetime.now(),
+        )
+
+        # Evaluate and execute automation rules
+        engine = RulesEngine(customer)
+        actions = engine.evaluate_event(event)
+        results = engine.execute_actions(actions)
+
+        logger.info(
+            f"Completed automation processing for claim {claim_id}: "
+            f"{len(actions)} actions evaluated, "
+            f"{sum(1 for r in results if r.success)} succeeded"
+        )
+
+        return {
+            "customer_id": customer_id,
+            "claim_id": claim_id,
+            "source": source,
+            "actions_executed": len(actions),
+            "status": "success",
+        }
+
+    except Customer.DoesNotExist:
+        logger.error(f"Customer {customer_id} not found")
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error processing claim with automation for customer {customer_id}: {str(e)}"
+        )
+        raise
+
+
 # Helper function to enqueue tasks conditionally
 def enqueue_or_run_sync(task: Any, *args: Any, **kwargs: Any) -> Any:
     """
