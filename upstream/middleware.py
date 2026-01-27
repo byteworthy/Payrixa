@@ -503,3 +503,53 @@ class ApiVersionMiddleware(MiddlewareMixin):
         """Add API-Version header to response."""
         response["API-Version"] = self.VERSION
         return response
+
+
+class SecurityHeadersMiddleware(MiddlewareMixin):
+    """
+    Middleware to add security headers to all HTTP responses.
+
+    This middleware adds industry-standard security headers following OWASP best
+    practices to protect against common web vulnerabilities.
+
+    Security headers added:
+        - X-Content-Type-Options: nosniff
+          Prevents browsers from MIME-sniffing responses, forcing declared content-type.
+          Protects against drive-by downloads and content injection attacks.
+
+        - X-XSS-Protection: 1; mode=block
+          Enables browser XSS filters in blocking mode (defense-in-depth for
+          legacy browsers). Modern browsers use Content-Security-Policy instead,
+          but this provides backward compatibility for older browsers.
+
+        - Strict-Transport-Security: max-age=31536000; includeSubDomains
+          Enforces HTTPS connections for 1 year, including subdomains.
+          Prevents protocol downgrade attacks and cookie hijacking.
+
+    Note: X-Frame-Options is already handled by Django's built-in
+    XFrameOptionsMiddleware and X_FRAME_OPTIONS setting.
+
+    Configuration:
+        Add to MIDDLEWARE in settings.py after SecurityMiddleware:
+
+        MIDDLEWARE = [
+            'django.middleware.security.SecurityMiddleware',
+            'upstream.middleware.SecurityHeadersMiddleware',
+            # ... rest of middleware ...
+        ]
+    """
+
+    def process_response(
+        self, request: HttpRequest, response: HttpResponse
+    ) -> HttpResponse:
+        """Add security headers to response."""
+        # Prevent MIME type sniffing
+        response["X-Content-Type-Options"] = "nosniff"
+
+        # Enable browser XSS filters (defense-in-depth for legacy browsers)
+        response["X-XSS-Protection"] = "1; mode=block"
+
+        # Enforce HTTPS for 1 year (31536000 seconds)
+        response["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        return response
