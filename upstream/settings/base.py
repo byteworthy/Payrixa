@@ -66,6 +66,8 @@ MIDDLEWARE = [
     "auditlog.middleware.AuditlogMiddleware",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
     "upstream.middleware.ApiVersionMiddleware",
+    # Request validation middleware - validates JSON payloads before view execution
+    "upstream.middleware.RequestValidationMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
