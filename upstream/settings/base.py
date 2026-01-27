@@ -44,10 +44,11 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Security headers (must be first for early-return responses)
+    "upstream.middleware.SecurityHeadersMiddleware",
     "upstream.middleware.HealthCheckMiddleware",  # Early exit for health checks
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "upstream.middleware.SecurityHeadersMiddleware",  # Custom security headers
     # QW-3: Compress responses (60-80% size reduction)
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
