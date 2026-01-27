@@ -10,5 +10,6 @@ service methods and format results into HTTP responses.
 """
 
 from .data_quality import DataQualityService
+from .report_generation import ReportGenerationService
 
-__all__ = ["DataQualityService"]
+__all__ = ["DataQualityService", "ReportGenerationService"]
