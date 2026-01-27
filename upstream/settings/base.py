@@ -375,14 +375,14 @@ PORTAL_BASE_URL = os.environ.get(
 # Field-level encryption key for PHI data (generate with: Fernet.generate_key())
 FIELD_ENCRYPTION_KEY = config("FIELD_ENCRYPTION_KEY", default="")
 
-# Session security - HIPAA-conscious configuration
+# Session Security Configuration (Defense-in-depth for HIPAA compliance)
 SESSION_ENGINE = (
     "django.contrib.sessions.backends.cache"  # Use Redis for session storage
 )
 SESSION_CACHE_ALIAS = "default"  # Use default cache (Redis)
 SESSION_COOKIE_AGE = 1800  # 30 minutes idle timeout (healthcare standard)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Close browser = logout
-SESSION_SAVE_EVERY_REQUEST = True  # Refresh timeout on each request
+SESSION_SAVE_EVERY_REQUEST = True  # Refresh session key on each request (prevents fixation)
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection (Lax allows normal navigation)
 # SESSION_COOKIE_SECURE set in prod.py (requires HTTPS)
