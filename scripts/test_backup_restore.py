@@ -19,7 +19,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict
 
 # Add project root to Python path
 project_root = Path(__file__).resolve().parent.parent
@@ -27,7 +27,8 @@ sys.path.insert(0, str(project_root))
 
 # Setup Django environment
 import django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'hello_world.settings')
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "hello_world.settings")
 django.setup()
 
 from django.conf import settings
@@ -39,21 +40,23 @@ class BackupVerificationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test class with database connection info."""
-        cls.db_config = settings.DATABASES['default']
-        cls.db_engine = cls.db_config['ENGINE']
+        cls.db_config = settings.DATABASES["default"]
+        cls.db_engine = cls.db_config["ENGINE"]
 
         # Skip tests if not using PostgreSQL
-        if 'postgresql' not in cls.db_engine:
+        if "postgresql" not in cls.db_engine:
             raise unittest.SkipTest(
                 f"Backup tests require PostgreSQL, found: {cls.db_engine}"
             )
 
         # Check if pg_dump and pg_restore are available
-        cls.pg_dump_available = cls._check_command('pg_dump')
-        cls.pg_restore_available = cls._check_command('pg_restore')
-        cls.psql_available = cls._check_command('psql')
+        cls.pg_dump_available = cls._check_command("pg_dump")
+        cls.pg_restore_available = cls._check_command("pg_restore")
+        cls.psql_available = cls._check_command("psql")
 
-        if not (cls.pg_dump_available and cls.pg_restore_available and cls.psql_available):
+        if not (
+            cls.pg_dump_available and cls.pg_restore_available and cls.psql_available
+        ):
             raise unittest.SkipTest(
                 "PostgreSQL client tools (pg_dump, pg_restore, psql) not available"
             )
@@ -67,10 +70,10 @@ class BackupVerificationTests(unittest.TestCase):
         """Check if a command is available on the system."""
         try:
             subprocess.run(
-                [command, '--version'],
+                [command, "--version"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                timeout=5
+                timeout=5,
             )
             return True
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -85,11 +88,11 @@ class BackupVerificationTests(unittest.TestCase):
         """Get PostgreSQL connection parameters from Django settings."""
         # Handle both dj_database_url parsed configs and direct configs
         params = {
-            'host': self.db_config.get('HOST', 'localhost'),
-            'port': str(self.db_config.get('PORT', '5432')),
-            'user': self.db_config.get('USER', 'postgres'),
-            'password': self.db_config.get('PASSWORD', ''),
-            'database': self.db_config.get('NAME', 'postgres'),
+            "host": self.db_config.get("HOST", "localhost"),
+            "port": str(self.db_config.get("PORT", "5432")),
+            "user": self.db_config.get("USER", "postgres"),
+            "password": self.db_config.get("PASSWORD", ""),
+            "database": self.db_config.get("NAME", "postgres"),
         }
 
         return params
@@ -97,13 +100,13 @@ class BackupVerificationTests(unittest.TestCase):
     def _build_pg_env(self, params: Dict[str, str]) -> Dict[str, str]:
         """Build environment variables for PostgreSQL commands."""
         env = os.environ.copy()
-        if params['password']:
-            env['PGPASSWORD'] = params['password']
+        if params["password"]:
+            env["PGPASSWORD"] = params["password"]
         return env
 
     def _log(self, message: str, verbose: bool = True):
         """Log a message if verbose mode is enabled."""
-        if verbose or getattr(self, '_verbose', False):
+        if verbose or getattr(self, "_verbose", False):
             print(f"[INFO] {message}")
 
     def _log_error(self, message: str):
@@ -114,8 +117,8 @@ class BackupVerificationTests(unittest.TestCase):
         """Redact database credentials from text."""
         params = self._get_pg_connection_params()
         redacted = text
-        if params['password']:
-            redacted = redacted.replace(params['password'], '[REDACTED]')
+        if params["password"]:
+            redacted = redacted.replace(params["password"], "[REDACTED]")
         return redacted
 
     def test_backup_creation(self):
@@ -128,7 +131,7 @@ class BackupVerificationTests(unittest.TestCase):
         env = self._build_pg_env(params)
 
         # Create backup file path
-        backup_path = Path(self.temp_dir.name) / 'test_backup.sql'
+        backup_path = Path(self.temp_dir.name) / "test_backup.sql"
 
         self._log(f"Creating backup of database: {params['database']}")
         self._log(f"Backup file: {backup_path}")
@@ -136,23 +139,24 @@ class BackupVerificationTests(unittest.TestCase):
         # Run pg_dump to create backup
         try:
             cmd = [
-                'pg_dump',
-                '-h', params['host'],
-                '-p', params['port'],
-                '-U', params['user'],
-                '-F', 'p',  # Plain SQL format
-                '-f', str(backup_path),
-                params['database']
+                "pg_dump",
+                "-h",
+                params["host"],
+                "-p",
+                params["port"],
+                "-U",
+                params["user"],
+                "-F",
+                "p",  # Plain SQL format
+                "-f",
+                str(backup_path),
+                params["database"],
             ]
 
             self._log(f"Running: {' '.join(cmd[:7])} [REDACTED] {cmd[-1]}")
 
             result = subprocess.run(
-                cmd,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30
+                cmd, env=env, capture_output=True, text=True, timeout=30
             )
 
             if result.returncode != 0:
@@ -168,20 +172,17 @@ class BackupVerificationTests(unittest.TestCase):
             self.fail(f"Unexpected error during backup creation: {e}")
 
         # Verify backup file exists
-        self.assertTrue(
-            backup_path.exists(),
-            "Backup file was not created"
-        )
+        self.assertTrue(backup_path.exists(), "Backup file was not created")
         self._log(f"✓ Backup file exists: {backup_path}")
 
         # Verify backup file has reasonable size (>1KB)
         file_size = backup_path.stat().st_size
         self.assertGreater(
-            file_size,
-            1024,
-            f"Backup file is suspiciously small: {file_size} bytes"
+            file_size, 1024, f"Backup file is suspiciously small: {file_size} bytes"
         )
-        self._log(f"✓ Backup file size: {file_size:,} bytes ({file_size / 1024:.2f} KB)")
+        self._log(
+            f"✓ Backup file size: {file_size:,} bytes ({file_size / 1024:.2f} KB)"
+        )
 
         # Store backup path for next tests
         self.__class__.backup_file = backup_path
@@ -204,20 +205,20 @@ class BackupVerificationTests(unittest.TestCase):
 
         # Read first 1000 bytes to check format
         try:
-            with open(backup_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(backup_path, "r", encoding="utf-8", errors="ignore") as f:
                 header = f.read(1000)
 
             # Check for PostgreSQL dump signature
             has_pg_signature = (
-                'PostgreSQL database dump' in header or
-                'pg_dump' in header or
-                'SET statement_timeout' in header or
-                'SET lock_timeout' in header
+                "PostgreSQL database dump" in header
+                or "pg_dump" in header
+                or "SET statement_timeout" in header
+                or "SET lock_timeout" in header
             )
 
             self.assertTrue(
                 has_pg_signature,
-                "Backup file does not contain PostgreSQL dump signature"
+                "Backup file does not contain PostgreSQL dump signature",
             )
             self._log("✓ PostgreSQL backup format validated")
 
@@ -227,16 +228,12 @@ class BackupVerificationTests(unittest.TestCase):
         # Calculate SHA256 checksum
         try:
             sha256 = hashlib.sha256()
-            with open(backup_path, 'rb') as f:
-                for chunk in iter(lambda: f.read(8192), b''):
+            with open(backup_path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
                     sha256.update(chunk)
             checksum = sha256.hexdigest()
 
-            self.assertEqual(
-                len(checksum),
-                64,
-                "Invalid SHA256 checksum length"
-            )
+            self.assertEqual(len(checksum), 64, "Invalid SHA256 checksum length")
             self._log(f"✓ SHA256 checksum: {checksum[:16]}...")
 
         except Exception as e:
@@ -244,25 +241,25 @@ class BackupVerificationTests(unittest.TestCase):
 
         # Verify backup is not empty
         file_size = backup_path.stat().st_size
-        self.assertGreater(
-            file_size,
-            0,
-            "Backup file is empty"
-        )
+        self.assertGreater(file_size, 0, "Backup file is empty")
 
         # Check for common corruption indicators
         try:
-            with open(backup_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(backup_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
 
             # Should not be binary garbage (at least 90% printable characters)
-            printable_ratio = sum(c.isprintable() or c in '\n\r\t' for c in content[:10000]) / min(len(content), 10000)
+            printable_ratio = sum(
+                c.isprintable() or c in "\n\r\t" for c in content[:10000]
+            ) / min(len(content), 10000)
             self.assertGreater(
                 printable_ratio,
                 0.9,
-                f"Backup file appears corrupted (only {printable_ratio:.1%} printable)"
+                f"Backup file appears corrupted (only {printable_ratio:.1%} printable)",
             )
-            self._log(f"✓ Content validation: {printable_ratio:.1%} printable characters")
+            self._log(
+                f"✓ Content validation: {printable_ratio:.1%} printable characters"
+            )
 
         except Exception as e:
             self.fail(f"Failed to validate backup content: {e}")
@@ -292,28 +289,31 @@ class BackupVerificationTests(unittest.TestCase):
         try:
             # Create test database
             create_cmd = [
-                'psql',
-                '-h', params['host'],
-                '-p', params['port'],
-                '-U', params['user'],
-                '-d', 'postgres',  # Connect to postgres db to create new db
-                '-c', f'CREATE DATABASE {test_db_name};'
+                "psql",
+                "-h",
+                params["host"],
+                "-p",
+                params["port"],
+                "-U",
+                params["user"],
+                "-d",
+                "postgres",  # Connect to postgres db to create new db
+                "-c",
+                f"CREATE DATABASE {test_db_name};",
             ]
 
             result = subprocess.run(
-                create_cmd,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=10
+                create_cmd, env=env, capture_output=True, text=True, timeout=10
             )
 
             if result.returncode != 0:
                 stderr_safe = self._redact_credentials(result.stderr)
                 # Check if database already exists (not a failure)
-                if 'already exists' not in result.stderr:
+                if "already exists" not in result.stderr:
                     self._log_error(f"Failed to create test database: {stderr_safe}")
-                    self.fail(f"Database creation failed with return code {result.returncode}")
+                    self.fail(
+                        f"Database creation failed with return code {result.returncode}"
+                    )
 
             self._log(f"✓ Temporary database created: {test_db_name}")
 
@@ -321,22 +321,27 @@ class BackupVerificationTests(unittest.TestCase):
             self._log(f"Restoring backup to: {test_db_name}")
 
             restore_cmd = [
-                'psql',
-                '-h', params['host'],
-                '-p', params['port'],
-                '-U', params['user'],
-                '-d', test_db_name,
-                '-f', str(backup_path)
+                "psql",
+                "-h",
+                params["host"],
+                "-p",
+                params["port"],
+                "-U",
+                params["user"],
+                "-d",
+                test_db_name,
+                "-f",
+                str(backup_path),
             ]
 
-            self._log(f"Running: psql -h {params['host']} -p {params['port']} -U {params['user']} -d {test_db_name} -f {backup_path}")
+            cmd_str = (
+                f"psql -h {params['host']} -p {params['port']} "
+                f"-U {params['user']} -d {test_db_name} -f {backup_path}"
+            )
+            self._log(f"Running: {cmd_str}")
 
             result = subprocess.run(
-                restore_cmd,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=30
+                restore_cmd, env=env, capture_output=True, text=True, timeout=30
             )
 
             # psql returns 0 even with some warnings, check for critical errors
@@ -344,8 +349,8 @@ class BackupVerificationTests(unittest.TestCase):
                 stderr_safe = self._redact_credentials(result.stderr)
                 self._log_error(f"Restore warnings/errors: {stderr_safe}")
                 # Only fail if there are actual ERROR lines (not just NOTICEs)
-                if 'ERROR:' in result.stderr:
-                    self.fail(f"Restore failed with critical errors")
+                if "ERROR:" in result.stderr:
+                    self.fail("Restore failed with critical errors")
 
             self._log("✓ Backup restored successfully")
 
@@ -353,32 +358,29 @@ class BackupVerificationTests(unittest.TestCase):
             self._log("Verifying restored database schema...")
 
             verify_cmd = [
-                'psql',
-                '-h', params['host'],
-                '-p', params['port'],
-                '-U', params['user'],
-                '-d', test_db_name,
-                '-t',  # Tuples only (no headers)
-                '-c', "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';"
+                "psql",
+                "-h",
+                params["host"],
+                "-p",
+                params["port"],
+                "-U",
+                params["user"],
+                "-d",
+                test_db_name,
+                "-t",  # Tuples only (no headers)
+                "-c",
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';",
             ]
 
             result = subprocess.run(
-                verify_cmd,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=10
+                verify_cmd, env=env, capture_output=True, text=True, timeout=10
             )
 
             if result.returncode != 0:
                 self.fail("Failed to query restored database")
 
             table_count = int(result.stdout.strip())
-            self.assertGreater(
-                table_count,
-                0,
-                "Restored database has no tables"
-            )
+            self.assertGreater(table_count, 0, "Restored database has no tables")
             self._log(f"✓ Restored database has {table_count} tables")
 
             self._log("✓ TEST 3 PASSED: Backup restore successful\n")
@@ -402,38 +404,43 @@ class BackupVerificationTests(unittest.TestCase):
 
         try:
             # Terminate existing connections
+            terminate_sql = (
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                f"WHERE datname = '{test_db_name}';"
+            )
             terminate_cmd = [
-                'psql',
-                '-h', params['host'],
-                '-p', params['port'],
-                '-U', params['user'],
-                '-d', 'postgres',
-                '-c', f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{test_db_name}';"
+                "psql",
+                "-h",
+                params["host"],
+                "-p",
+                params["port"],
+                "-U",
+                params["user"],
+                "-d",
+                "postgres",
+                "-c",
+                terminate_sql,
             ]
 
-            subprocess.run(
-                terminate_cmd,
-                env=env,
-                capture_output=True,
-                timeout=10
-            )
+            subprocess.run(terminate_cmd, env=env, capture_output=True, timeout=10)
 
             # Drop database
             drop_cmd = [
-                'psql',
-                '-h', params['host'],
-                '-p', params['port'],
-                '-U', params['user'],
-                '-d', 'postgres',
-                '-c', f'DROP DATABASE IF EXISTS {test_db_name};'
+                "psql",
+                "-h",
+                params["host"],
+                "-p",
+                params["port"],
+                "-U",
+                params["user"],
+                "-d",
+                "postgres",
+                "-c",
+                f"DROP DATABASE IF EXISTS {test_db_name};",
             ]
 
             result = subprocess.run(
-                drop_cmd,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=10
+                drop_cmd, env=env, capture_output=True, text=True, timeout=10
             )
 
             if result.returncode == 0:
@@ -448,12 +455,10 @@ class BackupVerificationTests(unittest.TestCase):
 def main():
     """Main entry point for the test script."""
     parser = argparse.ArgumentParser(
-        description='Test PostgreSQL backup creation, validation, and restore'
+        description="Test PostgreSQL backup creation, validation, and restore"
     )
     parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
+        "--verbose", "-v", action="store_true", help="Enable verbose output"
     )
 
     args = parser.parse_args()
@@ -470,5 +475,5 @@ def main():
     return 0 if result.wasSuccessful() else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
