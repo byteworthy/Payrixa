@@ -47,6 +47,7 @@ MIDDLEWARE = [
     "upstream.middleware.HealthCheckMiddleware",  # Early exit for health checks
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "upstream.middleware.SecurityHeadersMiddleware",  # Custom security headers
     # QW-3: Compress responses (60-80% size reduction)
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -341,10 +342,13 @@ CELERY_ENABLED = config("CELERY_ENABLED", default=False, cast=bool)
 
 # Flower Configuration
 # Dashboard for monitoring Celery workers, tasks, and queues
-FLOWER_BASIC_AUTH_USERNAME = config('FLOWER_BASIC_AUTH_USERNAME', default='admin')
-FLOWER_BASIC_AUTH_PASSWORD = config('FLOWER_BASIC_AUTH_PASSWORD', default='flower_dev_pass')
-FLOWER_PORT = config('FLOWER_PORT', default='5555', cast=int)
-# Note: In production, use strong password and consider additional security (VPN, firewall rules, OAuth)
+FLOWER_BASIC_AUTH_USERNAME = config("FLOWER_BASIC_AUTH_USERNAME", default="admin")
+FLOWER_BASIC_AUTH_PASSWORD = config(
+    "FLOWER_BASIC_AUTH_PASSWORD", default="flower_dev_pass"
+)
+FLOWER_PORT = config("FLOWER_PORT", default="5555", cast=int)
+# Note: In production, use strong password and consider additional security
+# (VPN, firewall rules, OAuth)
 
 # =============================================================================
 # V1 FEATURE FLAGS
@@ -382,7 +386,9 @@ SESSION_ENGINE = (
 SESSION_CACHE_ALIAS = "default"  # Use default cache (Redis)
 SESSION_COOKIE_AGE = 1800  # 30 minutes idle timeout (healthcare standard)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Close browser = logout
-SESSION_SAVE_EVERY_REQUEST = True  # Refresh session key on each request (prevents fixation)
+SESSION_SAVE_EVERY_REQUEST = (
+    True  # Refresh session key on each request (prevents fixation)
+)
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection (Lax allows normal navigation)
 # SESSION_COOKIE_SECURE set in prod.py (requires HTTPS)
