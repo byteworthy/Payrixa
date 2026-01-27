@@ -35,7 +35,6 @@ services:
   web:
     build:
       context: .
-      target: development
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
@@ -66,7 +65,6 @@ services:
   celery_worker:
     build:
       context: .
-      target: development
     command: celery -A upstream worker --loglevel=info
     volumes:
       - .:/app
@@ -92,7 +90,6 @@ services:
   celery_beat:
     build:
       context: .
-      target: development
     command: celery -A upstream beat --loglevel=info
     volumes:
       - .:/app
@@ -118,7 +115,6 @@ services:
   flower:
     build:
       context: .
-      target: development
     command: celery -A upstream --broker=redis://redis:6379/0 flower --port=5555 --basic_auth=admin:${FLOWER_PASSWORD:-flower_dev_pass}
     volumes:
       - .:/app

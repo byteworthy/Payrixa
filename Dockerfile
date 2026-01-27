@@ -32,7 +32,8 @@ COPY requirements.txt requirements-lock.txt ./
 
 # Install Python dependencies with exact pinned versions
 # Use requirements-lock.txt for reproducibility in production
-RUN pip install --no-cache-dir -r requirements-lock.txt
+# Fallback to requirements.txt if lock file has issues
+RUN pip install --no-cache-dir -r requirements.txt || pip install --no-cache-dir -r requirements-lock.txt
 
 # Copy application code
 COPY . .

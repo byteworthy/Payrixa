@@ -98,6 +98,12 @@ class DenialCluster(BaseModel):
         verbose_name = 'Denial Cluster'
         verbose_name_plural = 'Denial Clusters'
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(cluster_confidence__gte=0.0) & models.Q(cluster_confidence__lte=1.0),
+                name='denialcluster_confidence_range',
+            ),
+        ]
         indexes = [
             models.Index(fields=['customer', 'resolved', '-created_at']),
             models.Index(fields=['customer', 'cluster_id']),
@@ -179,6 +185,12 @@ class DenialCascade(BaseModel):
         verbose_name = 'Denial Cascade'
         verbose_name_plural = 'Denial Cascades'
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(confidence_score__gte=0.0) & models.Q(confidence_score__lte=1.0),
+                name='denialcascade_confidence_range',
+            ),
+        ]
         indexes = [
             models.Index(fields=['customer', 'resolved', '-created_at']),
             models.Index(fields=['customer', 'payer', 'cascade_type']),
@@ -311,6 +323,16 @@ class PreDenialWarning(BaseModel):
         verbose_name = 'Pre-Denial Warning'
         verbose_name_plural = 'Pre-Denial Warnings'
         ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(denial_probability__gte=0.0) & models.Q(denial_probability__lte=1.0),
+                name='predenialwarning_probability_range',
+            ),
+            models.CheckConstraint(
+                check=models.Q(confidence_score__gte=0.0) & models.Q(confidence_score__lte=1.0),
+                name='predenialwarning_confidence_range',
+            ),
+        ]
         indexes = [
             models.Index(fields=['customer', 'status', '-created_at']),
             models.Index(fields=['customer', 'payer', 'status']),

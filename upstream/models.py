@@ -136,6 +136,12 @@ class Upload(models.Model):
                 | models.Q(date_max__isnull=True),
                 name="upload_date_range_logical",
             ),
+            models.CheckConstraint(
+                check=models.Q(
+                    status__in=["processing", "success", "failed", "partial"]
+                ),
+                name="upload_status_valid",
+            ),
         ]
         indexes = [
             models.Index(
