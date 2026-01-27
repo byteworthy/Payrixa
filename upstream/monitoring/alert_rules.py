@@ -24,7 +24,7 @@ Usage:
 import logging
 import re
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from django.conf import settings
 from django.core.cache import cache
