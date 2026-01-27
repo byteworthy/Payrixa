@@ -84,6 +84,8 @@ Recent decisions affecting current work:
 - Signature utilities remain in integrations/services.py: Cryptographic protocol utilities used by both senders and receivers (quick-015)
 - Service methods accept model instances not IDs: Keeps service framework-agnostic (no Django ORM dependency in service layer) (quick-016)
 - Service handles all status transitions: Avoid duplication in tasks - service methods manage ReportRun status updates (quick-016)
+- min_length=500 for response compression: Optimal balance - skip compression overhead for small responses, achieve 60-80% reduction for large responses (quick-017)
+- Override process_response in ConfigurableGZipMiddleware: Django 5.2 hardcodes min_length=200 in method, requiring full override to achieve configurable threshold (quick-017)
 
 ### Pending Todos
 
@@ -152,8 +154,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27 16:16:29 (quick task execution)
-Stopped at: Completed quick task 015 (extract webhook processing service)
+Last session: 2026-01-27 16:15:30 (quick task execution)
+Stopped at: Completed quick task 017 (response compression with GZipMiddleware)
 Resume file: None
 
 ---
