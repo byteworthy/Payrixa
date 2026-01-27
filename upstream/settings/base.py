@@ -49,8 +49,8 @@ MIDDLEWARE = [
     "upstream.middleware.HealthCheckMiddleware",  # Early exit for health checks
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    # QW-3: Compress responses (60-80% size reduction)
-    "django.middleware.gzip.GZipMiddleware",
+    # QW-3: Compress responses with min_length=500 (60-80% size reduction for large responses)
+    "upstream.middleware.ConfigurableGZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.http.ConditionalGetMiddleware",  # QW-3: ETag support for caching
