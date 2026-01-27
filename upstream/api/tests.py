@@ -269,3 +269,168 @@ class ThrottleDocumentationTestCase(TestCase):
             "brute-force" in docstring or "brute force" in docstring,
             "AuthenticationThrottle should document brute-force prevention",
         )
+
+
+class RateLimitHeadersTestCase(TestCase):
+    """
+    Test rate limit response headers middleware.
+
+    Note: These are unit tests that verify middleware logic directly.
+    Integration testing with live API requests requires DRF's check_throttles
+    to be patched to expose throttle_instances, which is handled by the
+    _patch_drf_throttles() function in middleware.py at module load time.
+    """
+
+    def test_middleware_adds_headers_when_throttle_instances_present(self):
+        """Test that middleware adds headers when throttle_instances exists."""
+        from upstream.middleware import RateLimitHeadersMiddleware
+        from rest_framework.throttling import UserRateThrottle
+        from django.http import HttpRequest, HttpResponse
+        from unittest.mock import Mock
+        import time as time_module
+
+        # Create mock request with throttle_instances
+        request = Mock(spec=HttpRequest)
+        throttle = Mock(spec=UserRateThrottle)
+        throttle.num_requests = 1000
+        throttle.history = []  # No requests yet
+        throttle.duration = 3600  # 1 hour
+        request.throttle_instances = [throttle]
+
+        # Create response
+        response = HttpResponse()
+
+        # Create middleware and process response
+        middleware = RateLimitHeadersMiddleware(lambda r: response)
+        result = middleware.process_response(request, response)
+
+        # Verify headers were added
+        self.assertIn("X-RateLimit-Limit", result)
+        self.assertEqual(result["X-RateLimit-Limit"], "1000")
+        self.assertIn("X-RateLimit-Remaining", result)
+        self.assertEqual(result["X-RateLimit-Remaining"], "1000")
+        self.assertIn("X-RateLimit-Reset", result)
+        # Reset should be roughly now + 3600
+        reset = int(result["X-RateLimit-Reset"])
+        now = int(time_module.time())
+        self.assertGreater(reset, now)
+        self.assertLess(reset - now, 3700)  # Allow some slack
+
+    def test_headers_added_with_throttle_state(self):
+        """Test middleware adds headers when throttle instances present with state."""
+        from upstream.middleware import RateLimitHeadersMiddleware
+        from django.http import HttpResponse
+        from unittest.mock import Mock
+        import time as time_module
+
+        # Create mock request with throttle_instances
+        request = Mock()
+        throttle = Mock()
+        throttle.num_requests = 1000
+        throttle.history = [time_module.time() - 100]  # 1 request in history
+        throttle.duration = 3600  # 1 hour
+        request.throttle_instances = [throttle]
+
+        response = HttpResponse()
+        middleware = RateLimitHeadersMiddleware(lambda r: response)
+        result = middleware.process_response(request, response)
+
+        # Verify headers were added
+        self.assertIn("X-RateLimit-Limit", result)
+        self.assertEqual(result["X-RateLimit-Limit"], "1000")
+        self.assertIn("X-RateLimit-Remaining", result)
+        self.assertEqual(result["X-RateLimit-Remaining"], "999")  # 1000 - 1 in history
+        self.assertIn("X-RateLimit-Reset", result)
+
+    def test_most_restrictive_throttle_selected(self):
+        """Test that most restrictive throttle is used for headers."""
+        from upstream.middleware import RateLimitHeadersMiddleware
+        from django.http import HttpResponse
+        from unittest.mock import Mock
+        import time as time_module
+
+        request = Mock()
+        # Two throttles with different limits
+        throttle1 = Mock()
+        throttle1.num_requests = 1000
+        throttle1.history = []
+        throttle1.duration = 3600
+
+        throttle2 = Mock()
+        throttle2.num_requests = 60  # More restrictive
+        throttle2.history = [time_module.time() - 10] * 5  # 5 requests
+        throttle2.duration = 60
+
+        request.throttle_instances = [throttle1, throttle2]
+
+        response = HttpResponse()
+        middleware = RateLimitHeadersMiddleware(lambda r: response)
+        result = middleware.process_response(request, response)
+
+        # Should use throttle2 (55 remaining vs 1000 remaining)
+        self.assertEqual(result["X-RateLimit-Limit"], "60")
+        self.assertEqual(result["X-RateLimit-Remaining"], "55")
+
+    def test_no_headers_without_throttle_instances(self):
+        """Test that middleware skips adding headers when no throttle_instances."""
+        from upstream.middleware import RateLimitHeadersMiddleware
+        from django.http import HttpResponse
+        from unittest.mock import Mock
+
+        request = Mock(spec=[])  # No throttle_instances attribute
+        response = HttpResponse()
+
+        middleware = RateLimitHeadersMiddleware(lambda r: response)
+        result = middleware.process_response(request, response)
+
+        # Should not add headers
+        self.assertNotIn("X-RateLimit-Limit", result)
+        self.assertNotIn("X-RateLimit-Remaining", result)
+        self.assertNotIn("X-RateLimit-Reset", result)
+
+    def test_zero_remaining_when_at_limit(self):
+        """Test that remaining shows 0 when throttle limit reached."""
+        from upstream.middleware import RateLimitHeadersMiddleware
+        from django.http import HttpResponse
+        from unittest.mock import Mock
+        import time as time_module
+
+        request = Mock()
+        throttle = Mock()
+        throttle.num_requests = 10
+        throttle.history = [
+            time_module.time() - i for i in range(10)
+        ]  # 10 requests (at limit)
+        throttle.duration = 600
+
+        request.throttle_instances = [throttle]
+
+        response = HttpResponse()
+        middleware = RateLimitHeadersMiddleware(lambda r: response)
+        result = middleware.process_response(request, response)
+
+        self.assertEqual(result["X-RateLimit-Remaining"], "0")
+
+    def test_reset_time_in_future(self):
+        """Test that reset timestamp is in the future."""
+        from upstream.middleware import RateLimitHeadersMiddleware
+        from django.http import HttpResponse
+        from unittest.mock import Mock
+        import time as time_module
+
+        request = Mock()
+        throttle = Mock()
+        throttle.num_requests = 100
+        throttle.history = []
+        throttle.duration = 3600
+
+        request.throttle_instances = [throttle]
+
+        response = HttpResponse()
+        middleware = RateLimitHeadersMiddleware(lambda r: response)
+        result = middleware.process_response(request, response)
+
+        reset = int(result["X-RateLimit-Reset"])
+        now = int(time_module.time())
+        self.assertGreater(reset, now)
+        self.assertLess(reset - now, 3700)  # Should be ~3600 + some slack
