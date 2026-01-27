@@ -281,3 +281,50 @@ if SENTRY_DSN:
 else:
     # Sentry not configured - errors will only appear in logs
     pass
+
+# =============================================================================
+# APPLICATION PERFORMANCE MONITORING (DataDog APM)
+# =============================================================================
+
+DD_API_KEY = config("DD_API_KEY", default=None)
+
+if DD_API_KEY:
+    from ddtrace import patch_all, config as dd_config
+
+    # Configure DataDog APM settings before patching
+    dd_config.django["service_name"] = config("DD_SERVICE", default="upstream-api")
+    dd_config.django["distributed_tracing_enabled"] = True
+    dd_config.django["analytics_enabled"] = True
+    dd_config.django["analytics_sample_rate"] = 1.0  # 100% APM sampling
+
+    # Configure trace agent
+    dd_config.trace_agent_url = "http://localhost:8126"  # Standard DataDog agent port
+
+    # Environment and version tags (correlate with Sentry)
+    dd_config.env = config("DD_ENV", default="production")
+    dd_config.version = config("DD_VERSION", default=None)
+    dd_config.service = config("DD_SERVICE", default="upstream-api")
+
+    # HIPAA Compliance: Disable automatic tagging of sensitive data
+    # By default, ddtrace does not capture request/response bodies
+    # These settings ensure no PII/PHI is sent to DataDog
+    dd_config.django["trace_query_string"] = False  # Don't trace query params (may contain PHI)
+    dd_config.django["include_user_name"] = False  # Don't include user names (PII)
+
+    # Celery configuration
+    dd_config.celery["distributed_tracing_enabled"] = True
+    dd_config.celery["analytics_enabled"] = True
+
+    # Redis configuration
+    dd_config.redis["service_name"] = f"{config('DD_SERVICE', default='upstream')}-redis"
+
+    # Apply automatic instrumentation to all supported libraries
+    # This patches: Django, Celery, Redis, psycopg2, requests, urllib3
+    patch_all()
+
+    # Note: DataDog agent must be running to receive traces
+    # Install: https://docs.datadoghq.com/agent/
+    # Agent listens on localhost:8126 by default
+else:
+    # DataDog not configured - traces will only be captured by Sentry
+    pass
