@@ -121,38 +121,17 @@ jobs:
           --only-summary
       continue-on-error: true
 
-    - name: Check performance thresholds
+    # Compare against baseline (perf_baseline.json) - fails if p95 regresses >20% or errors increase >2%
+    - name: Check performance regression
       run: |
-        # Parse CSV results and check p95 < 500ms
-        python -c "
-        import csv
-        import sys
+        python scripts/check_performance_regression.py perf_results_stats.csv
+      continue-on-error: false
 
-        try:
-            with open('perf_results_stats.csv', 'r') as f:
-                reader = csv.DictReader(f)
-                failures = []
-                for row in reader:
-                    if row['Name'] == 'Aggregated':
-                        p95 = float(row['95%']) if row['95%'] else 0
-                        error_rate = float(row['Failure Count']) / max(float(row['Request Count']), 1) * 100
-
-                        if p95 > 500:
-                            failures.append(f'p95 latency {p95}ms exceeds 500ms threshold')
-                        if error_rate > 5:
-                            failures.append(f'Error rate {error_rate:.1f}% exceeds 5% threshold')
-
-                if failures:
-                    print('Performance check FAILED:')
-                    for f in failures:
-                        print(f'  - {f}')
-                    sys.exit(1)
-                else:
-                    print('Performance check PASSED')
-        except FileNotFoundError:
-            print('No performance results found - tests may have failed to run')
-            sys.exit(1)
-        "
+    - name: Show performance comparison
+      if: always()
+      run: |
+        echo "Performance Baseline Comparison:"
+        python scripts/check_performance_regression.py perf_results_stats.csv --verbose || true
 
     - name: Upload performance results
       uses: actions/upload-artifact@v4
