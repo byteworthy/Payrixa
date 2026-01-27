@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 Phase: 3 of 6 (OpenAPI Documentation & Error Standardization)
 Plan: 0 of TBD (ready to start)
 Status: Ready for execution
-Last activity: 2026-01-27 — Completed quick task 019 (Extract data export service)
+Last activity: 2026-01-27 — Completed quick task 021 (Review and configure CORS settings)
 
 Progress: [███████░░░] 67%
 
@@ -86,6 +86,8 @@ Recent decisions affecting current work:
 - Service handles all status transitions: Avoid duplication in tasks - service methods manage ReportRun status updates (quick-016)
 - min_length=500 for response compression: Optimal balance - skip compression overhead for small responses, achieve 60-80% reduction for large responses (quick-017)
 - Override process_response in ConfigurableGZipMiddleware: Django 5.2 hardcodes min_length=200 in method, requiring full override to achieve configurable threshold (quick-017)
+- CORS_EXPOSE_HEADERS for 6 custom headers: API-Version, X-Request-Id, X-Request-Duration-Ms, ETag, Last-Modified, Cache-Control exposed for JavaScript client access (quick-021)
+- Security headers NOT in CORS_EXPOSE_HEADERS: X-Content-Type-Options, X-XSS-Protection, Strict-Transport-Security are browser-only policies, not for JavaScript access (quick-021)
 
 ### Pending Todos
 
@@ -113,6 +115,7 @@ None yet.
 | 016 | Extract report scheduling service | 2026-01-27 | a67ea81d, 3dbc67cd | [016-extract-report-scheduling-service](./quick/016-extract-report-scheduling-service/) |
 | 017 | Add response compression with GZipMiddleware | 2026-01-27 | 0a83c49c, ab0576ff, 0daa7d85 | [017-add-response-compression-with-gzipmid](./quick/017-add-response-compression-with-gzipmid/) |
 | 019 | Extract data export service | 2026-01-27 | 81ed4186, 7bfbbdfd | [019-extract-data-export-service](./quick/019-extract-data-export-service/) |
+| 021 | Review and configure CORS settings | 2026-01-27 | a88e84f7, 589bcc1f, e0bfba9c | [021-review-and-configure-cors-settings](./quick/021-review-and-configure-cors-settings/) |
 
 ### Blockers/Concerns
 
@@ -155,8 +158,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27 16:21:10 (quick task execution)
-Stopped at: Completed quick task 019 (extract data export service)
+Last session: 2026-01-27 16:22:50 (quick task execution)
+Stopped at: Completed quick task 021 (review and configure CORS settings)
 Resume file: None
 
 ---
