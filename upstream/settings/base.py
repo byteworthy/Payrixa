@@ -121,6 +121,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Password reset link expires after 24 hours
+PASSWORD_RESET_TIMEOUT = 86400  # 24 hours in seconds
+
 # Login settings
 LOGIN_URL = "/portal/login/"
 LOGIN_REDIRECT_URL = "/portal/"
