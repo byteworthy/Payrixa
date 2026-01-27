@@ -49,7 +49,7 @@ MIDDLEWARE = [
     "upstream.middleware.HealthCheckMiddleware",  # Early exit for health checks
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    # QW-3: Compress responses with min_length=500 (60-80% size reduction for large responses)
+    # QW-3: Compress with min_length=500 (60-80% size reduction)
     "upstream.middleware.ConfigurableGZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -207,6 +207,17 @@ CORS_ALLOWED_ORIGINS = config(
 ).split(",")
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Expose custom headers to cross-origin JavaScript clients
+# Without this, headers are sent but inaccessible via response.headers.get()
+CORS_EXPOSE_HEADERS = [
+    "API-Version",  # From ApiVersionMiddleware - track API version
+    "X-Request-Id",  # From RequestIdMiddleware - request tracing
+    "X-Request-Duration-Ms",  # From RequestTimingMiddleware - perf
+    "ETag",  # From ConditionalGetMiddleware - conditional requests
+    "Last-Modified",  # Standard caching header
+    "Cache-Control",  # Standard caching header
+]
 
 # =============================================================================
 # AUDIT LOGGING (HIPAA Compliance)
