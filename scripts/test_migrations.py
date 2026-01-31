@@ -116,9 +116,7 @@ class MigrationTester:
 
     def get_migration_state(self):
         """Get current migration state for all apps."""
-        result = self.run_command(
-            "python manage.py showmigrations --plan", check=False
-        )
+        result = self.run_command("python manage.py showmigrations --plan", check=False)
 
         if result.returncode != 0:
             return None
@@ -180,12 +178,12 @@ class MigrationTester:
         app_migrations = migrations[app]
 
         # Test only last 5 migrations to keep CI time reasonable
-        migrations_to_test = app_migrations[-5:] if len(app_migrations) > 5 else app_migrations
+        migrations_to_test = (
+            app_migrations[-5:] if len(app_migrations) > 5 else app_migrations
+        )
         num_to_test = len(migrations_to_test)
 
-        print(
-            f"Testing rollback for last {num_to_test} migration(s) of {app} app\n"
-        )
+        print(f"Testing rollback for last {num_to_test} migration(s) of {app} app\n")
 
         rollback_failures = []
 
@@ -194,11 +192,11 @@ class MigrationTester:
             self.log(f"\nTesting rollback: {app}.{migration}", Colors.BLUE)
 
             # Get previous migration
-            prev_migration = self.get_previous_migration(
-                app, migration, app_migrations
-            )
+            prev_migration = self.get_previous_migration(app, migration, app_migrations)
             if prev_migration is None:
-                self.log(f"  Skipping (can't determine previous migration)", Colors.YELLOW)
+                self.log(
+                    f"  Skipping (can't determine previous migration)", Colors.YELLOW
+                )
                 self.skipped_count += 1
                 continue
 
@@ -227,9 +225,7 @@ class MigrationTester:
             )
 
             if result.returncode != 0:
-                self.log(
-                    f"  {Colors.RED}✗ Re-apply failed{Colors.END}", Colors.RED
-                )
+                self.log(f"  {Colors.RED}✗ Re-apply failed{Colors.END}", Colors.RED)
                 rollback_failures.append((migration, "re-apply"))
                 self.failed_count += 1
                 continue
@@ -244,9 +240,7 @@ class MigrationTester:
                 print(f"  {Colors.RED}✗ {app}.{migration} ({phase}){Colors.END}")
             return False
         else:
-            print(
-                f"\n{Colors.GREEN}✓ All rollback tests passed{Colors.END}"
-            )
+            print(f"\n{Colors.GREEN}✓ All rollback tests passed{Colors.END}")
             return True
 
     def run_all_tests(self):
@@ -258,9 +252,7 @@ class MigrationTester:
         # Check environment
         if not os.getenv("DJANGO_SETTINGS_MODULE"):
             os.environ["DJANGO_SETTINGS_MODULE"] = "hello_world.settings"
-            self.log(
-                "Set DJANGO_SETTINGS_MODULE=hello_world.settings", Colors.BLUE
-            )
+            self.log("Set DJANGO_SETTINGS_MODULE=hello_world.settings", Colors.BLUE)
 
         # Run forward migration tests
         forward_success = self.test_forward_migration()
@@ -295,9 +287,7 @@ class MigrationTester:
         print()
 
         if self.failed_count > 0:
-            print(
-                f"{Colors.RED}{Colors.BOLD}MIGRATION TESTS FAILED{Colors.END}"
-            )
+            print(f"{Colors.RED}{Colors.BOLD}MIGRATION TESTS FAILED{Colors.END}")
             print(
                 f"{Colors.RED}Fix migration issues before deploying to "
                 f"production.{Colors.END}\n"

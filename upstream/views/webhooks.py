@@ -53,9 +53,7 @@ def ehr_webhook(request, provider):
 
         if not api_key:
             logger.warning("EHR webhook request missing X-API-Key header")
-            return JsonResponse(
-                {"error": "Missing X-API-Key header"}, status=401
-            )
+            return JsonResponse({"error": "Missing X-API-Key header"}, status=401)
 
         # Authenticate customer
         # TODO: Replace with proper API key model field + secure token generation
@@ -66,9 +64,7 @@ def ehr_webhook(request, provider):
             customer = Customer.objects.get(name=api_key)
         except Customer.DoesNotExist:
             logger.warning(f"EHR webhook invalid API key: {api_key}")
-            return JsonResponse(
-                {"error": "Invalid API key"}, status=401
-            )
+            return JsonResponse({"error": "Invalid API key"}, status=401)
 
         # Parse FHIR R4 payload
         payload = json.loads(request.body.decode("utf-8"))

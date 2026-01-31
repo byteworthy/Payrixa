@@ -345,7 +345,7 @@ class PayerDriftTests(TestCase):
             submitted_date=submitted_date,
             decided_date=decided_date,
             outcome=outcome,
-            submitted_via='csv_upload',
+            submitted_via="csv_upload",
         )
 
     def test_denial_rate_drift_up(self):
@@ -638,7 +638,7 @@ class PayerDriftTests(TestCase):
                 submitted_date=submitted_date,
                 decided_date=decided_date,
                 outcome=outcome,
-                submitted_via='csv_upload',
+                submitted_via="csv_upload",
             )
 
         # Current period (last 14 days) - high denial rate (60%)
@@ -658,7 +658,7 @@ class PayerDriftTests(TestCase):
                 submitted_date=submitted_date,
                 decided_date=decided_date,
                 outcome=outcome,
-                submitted_via='csv_upload',
+                submitted_via="csv_upload",
             )
 
         # Verify select_for_update() is used in the code
@@ -716,7 +716,7 @@ class ReportArtifactTests(TestCase):
             submitted_date=submitted_date,
             decided_date=decided_date,
             outcome=outcome,
-            submitted_via='csv_upload',
+            submitted_via="csv_upload",
         )
 
     @skipUnless(

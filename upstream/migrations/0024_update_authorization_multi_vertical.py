@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("upstream", "0023_claimrecord_submitted_via_authorization_executionlog"),
     ]

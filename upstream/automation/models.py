@@ -25,66 +25,60 @@ class ClaimScore(models.Model):
     """
 
     claim = models.OneToOneField(
-        ClaimRecord,
-        on_delete=models.CASCADE,
-        related_name="score"
+        ClaimRecord, on_delete=models.CASCADE, related_name="score"
     )
     customer = models.ForeignKey(
-        Customer,
-        on_delete=models.CASCADE,
-        related_name="claim_scores"
+        Customer, on_delete=models.CASCADE, related_name="claim_scores"
     )
 
     # Overall confidence metrics (0.0-1.0)
     overall_confidence = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
         help_text="Overall confidence score for automation decision",
-        db_index=True
+        db_index=True,
     )
     coding_confidence = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Confidence in CPT code accuracy"
+        help_text="Confidence in CPT code accuracy",
     )
     eligibility_confidence = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Confidence patient is eligible for service"
+        help_text="Confidence patient is eligible for service",
     )
     medical_necessity_confidence = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Confidence medical necessity criteria are met"
+        help_text="Confidence medical necessity criteria are met",
     )
     documentation_completeness = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Completeness of supporting documentation"
+        help_text="Completeness of supporting documentation",
     )
 
     # Risk factors (0.0-1.0, higher = more risk)
     denial_risk_score = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
         help_text="Probability of denial based on historical patterns",
-        db_index=True
+        db_index=True,
     )
     fraud_risk_score = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Fraud detection score (NPI patterns, billing anomalies)"
+        help_text="Fraud detection score (NPI patterns, billing anomalies)",
     )
     compliance_risk_score = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Risk of compliance violation (Stark, Anti-Kickback)"
+        help_text="Risk of compliance violation (Stark, Anti-Kickback)",
     )
 
     # Model metadata for explainability
     model_version = models.CharField(
-        max_length=50,
-        help_text="ML model version used for scoring (e.g., 'rf_v2.1')"
+        max_length=50, help_text="ML model version used for scoring (e.g., 'rf_v2.1')"
     )
     feature_importance = models.JSONField(
         default=dict,
-        help_text="Top features influencing score: {'payer_history': 0.35, ...}"
+        help_text="Top features influencing score: {'payer_history': 0.35, ...}",
     )
     prediction_reasoning = models.TextField(
-        blank=True,
-        help_text="Human-readable explanation of score (for transparency)"
+        blank=True, help_text="Human-readable explanation of score (for transparency)"
     )
 
     # Automation decision
@@ -98,7 +92,7 @@ class ClaimScore(models.Model):
         max_length=50,
         choices=RECOMMENDED_ACTION_CHOICES,
         db_index=True,
-        help_text="Automation tier recommendation based on scoring"
+        help_text="Automation tier recommendation based on scoring",
     )
     automation_tier = models.IntegerField(
         choices=[
@@ -106,19 +100,19 @@ class ClaimScore(models.Model):
             (2, "Tier 2: Queue Review"),
             (3, "Tier 3: Escalate"),
         ],
-        db_index=True
+        db_index=True,
     )
 
     # Red-line detection (actions requiring human review by law)
     requires_human_review = models.BooleanField(
         default=False,
         db_index=True,
-        help_text="Legal/compliance requirement for human review"
+        help_text="Legal/compliance requirement for human review",
     )
     red_line_reason = models.CharField(
         max_length=200,
         blank=True,
-        help_text="Why human review is required (e.g., 'Medical necessity determination - CA SB 1120')"
+        help_text="Why human review is required (e.g., 'Medical necessity determination - CA SB 1120')",
     )
 
     # Timestamps
@@ -130,15 +124,14 @@ class ClaimScore(models.Model):
         indexes = [
             models.Index(
                 fields=["customer", "overall_confidence"],
-                name="claim_score_confidence_idx"
+                name="claim_score_confidence_idx",
             ),
             models.Index(
-                fields=["customer", "automation_tier"],
-                name="claim_score_tier_idx"
+                fields=["customer", "automation_tier"], name="claim_score_tier_idx"
             ),
             models.Index(
                 fields=["requires_human_review", "created_at"],
-                name="claim_score_review_idx"
+                name="claim_score_review_idx",
             ),
         ]
 
@@ -158,9 +151,7 @@ class CustomerAutomationProfile(models.Model):
     """
 
     customer = models.OneToOneField(
-        Customer,
-        on_delete=models.CASCADE,
-        related_name="automation_profile"
+        Customer, on_delete=models.CASCADE, related_name="automation_profile"
     )
 
     # Trust calibration stage
@@ -174,37 +165,36 @@ class CustomerAutomationProfile(models.Model):
         max_length=20,
         choices=AUTOMATION_STAGE_CHOICES,
         default="observe",
-        help_text="Current trust calibration stage"
+        help_text="Current trust calibration stage",
     )
     stage_start_date = models.DateField(
-        auto_now_add=True,
-        help_text="When customer entered current stage"
+        auto_now_add=True, help_text="When customer entered current stage"
     )
 
     # Tier 1 thresholds (Auto-Execute)
     auto_execute_confidence = models.FloatField(
         default=0.95,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Minimum confidence score for autonomous execution"
+        help_text="Minimum confidence score for autonomous execution",
     )
     auto_execute_max_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=1000,
-        help_text="Maximum dollar amount for autonomous submission"
+        help_text="Maximum dollar amount for autonomous submission",
     )
 
     # Tier 2 thresholds (Queue for Review)
     queue_review_min_confidence = models.FloatField(
         default=0.70,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Minimum confidence for queueing (below triggers escalation)"
+        help_text="Minimum confidence for queueing (below triggers escalation)",
     )
     queue_review_max_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=10000,
-        help_text="Maximum dollar amount for review queue (above triggers escalation)"
+        help_text="Maximum dollar amount for review queue (above triggers escalation)",
     )
 
     # Tier 3 thresholds (Escalate)
@@ -212,76 +202,65 @@ class CustomerAutomationProfile(models.Model):
         max_digits=12,
         decimal_places=2,
         default=10000,
-        help_text="Minimum dollar amount requiring escalation"
+        help_text="Minimum dollar amount requiring escalation",
     )
 
     # Action-specific automation toggles
     auto_submit_claims = models.BooleanField(
-        default=False,
-        help_text="Enable autonomous claim submission to payers"
+        default=False, help_text="Enable autonomous claim submission to payers"
     )
     auto_check_status = models.BooleanField(
-        default=True,
-        help_text="Enable autonomous claim status checks"
+        default=True, help_text="Enable autonomous claim status checks"
     )
     auto_verify_eligibility = models.BooleanField(
-        default=True,
-        help_text="Enable autonomous patient eligibility verification"
+        default=True, help_text="Enable autonomous patient eligibility verification"
     )
     auto_submit_prior_auth = models.BooleanField(
-        default=False,
-        help_text="Enable autonomous prior authorization submission"
+        default=False, help_text="Enable autonomous prior authorization submission"
     )
     auto_modify_codes = models.BooleanField(
-        default=False,
-        help_text="Enable autonomous CPT code corrections"
+        default=False, help_text="Enable autonomous CPT code corrections"
     )
     auto_submit_appeals = models.BooleanField(
         default=False,
-        help_text="Enable autonomous appeal submission (ALWAYS FALSE - legal requirement)"
+        help_text="Enable autonomous appeal submission (ALWAYS FALSE - legal requirement)",
     )
 
     # Shadow mode configuration
     shadow_mode_enabled = models.BooleanField(
-        default=True,
-        help_text="Run AI in parallel with humans to validate accuracy"
+        default=True, help_text="Run AI in parallel with humans to validate accuracy"
     )
     shadow_mode_start_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="When shadow mode was enabled"
+        null=True, blank=True, help_text="When shadow mode was enabled"
     )
     shadow_accuracy_rate = models.FloatField(
         null=True,
         blank=True,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Current shadow mode accuracy (human agreement rate)"
+        help_text="Current shadow mode accuracy (human agreement rate)",
     )
     shadow_mode_min_accuracy = models.FloatField(
         default=0.95,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
-        help_text="Required accuracy before enabling live automation"
+        help_text="Required accuracy before enabling live automation",
     )
 
     # Notification preferences
     notify_on_auto_execute = models.BooleanField(
-        default=False,
-        help_text="Send notification after autonomous actions (Stage 3+)"
+        default=False, help_text="Send notification after autonomous actions (Stage 3+)"
     )
     notify_on_escalation = models.BooleanField(
-        default=True,
-        help_text="Send notification when action escalated to human"
+        default=True, help_text="Send notification when action escalated to human"
     )
     notification_email = models.EmailField(
-        blank=True,
-        help_text="Email for automation notifications"
+        blank=True, help_text="Email for automation notifications"
     )
 
     # Undo window configuration
     undo_window_hours = models.IntegerField(
         default=2,
         validators=[MinValueValidator(0), MaxValueValidator(24)],
-        help_text="Hours available to undo autonomous actions"
+        help_text="Hours available to undo autonomous actions",
     )
 
     # Compliance settings
@@ -291,11 +270,10 @@ class CustomerAutomationProfile(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="compliance_profiles",
-        help_text="User who controls automation guardrails"
+        help_text="User who controls automation guardrails",
     )
     audit_all_actions = models.BooleanField(
-        default=True,
-        help_text="Log all automation actions (HIPAA requirement)"
+        default=True, help_text="Log all automation actions (HIPAA requirement)"
     )
 
     # Timestamps
@@ -331,8 +309,10 @@ class CustomerAutomationProfile(models.Model):
         if claim_score.overall_confidence < self.auto_execute_confidence:
             return False
 
-        if claim_score.claim.allowed_amount and \
-           claim_score.claim.allowed_amount > self.auto_execute_max_amount:
+        if (
+            claim_score.claim.allowed_amount
+            and claim_score.claim.allowed_amount > self.auto_execute_max_amount
+        ):
             return False
 
         return self.auto_submit_claims  # Final toggle check
@@ -353,8 +333,10 @@ class CustomerAutomationProfile(models.Model):
         if claim_score.overall_confidence < self.queue_review_min_confidence:
             return True
 
-        if claim_score.claim.allowed_amount and \
-           claim_score.claim.allowed_amount >= self.escalate_min_amount:
+        if (
+            claim_score.claim.allowed_amount
+            and claim_score.claim.allowed_amount >= self.escalate_min_amount
+        ):
             return True
 
         if claim_score.fraud_risk_score > 0.7:
@@ -374,14 +356,10 @@ class ShadowModeResult(models.Model):
     """
 
     customer = models.ForeignKey(
-        Customer,
-        on_delete=models.CASCADE,
-        related_name="shadow_results"
+        Customer, on_delete=models.CASCADE, related_name="shadow_results"
     )
     claim_score = models.ForeignKey(
-        ClaimScore,
-        on_delete=models.CASCADE,
-        related_name="shadow_results"
+        ClaimScore, on_delete=models.CASCADE, related_name="shadow_results"
     )
 
     # AI prediction
@@ -391,10 +369,7 @@ class ShadowModeResult(models.Model):
     # Human decision
     human_action_taken = models.CharField(max_length=50)
     human_decision_user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="shadow_decisions"
+        User, on_delete=models.SET_NULL, null=True, related_name="shadow_decisions"
     )
     human_decision_timestamp = models.DateTimeField()
 
@@ -409,13 +384,12 @@ class ShadowModeResult(models.Model):
             ("true_negative", "True Negative: AI correct"),
             ("false_positive", "False Positive: AI wrong"),
             ("false_negative", "False Negative: AI wrong"),
-        ]
+        ],
     )
 
     # Notes
     discrepancy_reason = models.TextField(
-        blank=True,
-        help_text="Why human disagreed with AI (if applicable)"
+        blank=True, help_text="Why human disagreed with AI (if applicable)"
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -425,7 +399,7 @@ class ShadowModeResult(models.Model):
         indexes = [
             models.Index(
                 fields=["customer", "actions_match", "created_at"],
-                name="shadow_accuracy_idx"
+                name="shadow_accuracy_idx",
             ),
         ]
 

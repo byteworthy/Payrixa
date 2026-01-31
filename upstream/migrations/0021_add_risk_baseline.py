@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("upstream", "0020_add_check_constraints_data_integrity"),
     ]

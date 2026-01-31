@@ -104,7 +104,7 @@ class APITestBase(APITestCase):
             decided_date=timezone.now().date() - timedelta(days=5),
             outcome="PAID",
             allowed_amount=100.00,
-            submitted_via='csv_upload',
+            submitted_via="csv_upload",
         )
 
     def create_report_run_for_customer(self, customer):

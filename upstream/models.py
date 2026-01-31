@@ -1026,7 +1026,9 @@ class RiskBaseline(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.customer.name} - {self.payer} - {self.cpt}: {self.denial_rate:.1%}"
+        return (
+            f"{self.customer.name} - {self.payer} - {self.cpt}: {self.denial_rate:.1%}"
+        )
 
 
 class AutomationRule(models.Model):
